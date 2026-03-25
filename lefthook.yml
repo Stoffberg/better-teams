@@ -1,0 +1,20 @@
+pre-commit:
+  parallel: true
+  commands:
+    biome:
+      glob: "*.{ts,tsx,js,jsx,mjs,cjs,json,css,html}"
+      run: bunx biome check --staged --no-errors-on-unmatched
+    typecheck:
+      run: bun run typecheck
+    test:
+      run: bun run test
+
+pre-push:
+  commands:
+    verify:
+      run: bun run verify
+
+commit-msg:
+  commands:
+    commitlint:
+      run: bunx commitlint --edit {1}

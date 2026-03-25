@@ -1,0 +1,29 @@
+{
+  "identifier": "default",
+  "description": "Default permissions",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    {
+      "identifier": "http:default",
+      "allow": [
+        { "url": "https://*.microsoft.com/**" },
+        { "url": "https://*.skype.com/**" },
+        { "url": "https://*.office.net/**" },
+        { "url": "https://*.office.com/**" },
+        { "url": "https://*.microsoftonline.com/**" },
+        { "url": "https://*.azureedge.net/**" }
+      ]
+    },
+    "http:allow-fetch",
+    "http:allow-fetch-cancel",
+    "http:allow-fetch-read-body",
+    "http:allow-fetch-send",
+    "sql:default",
+    "sql:allow-load",
+    "sql:allow-execute",
+    "sql:allow-select",
+    "sql:allow-close",
+    "opener:default"
+  ]
+}

@@ -1,0 +1,60 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="card-bg" x1="0" y1="0" x2="1200" y2="630" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1E1B4B"/>
+      <stop offset="1" stop-color="#312E81"/>
+    </linearGradient>
+    <linearGradient id="icon-g" x1="0" y1="0" x2="160" y2="160" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#4338CA"/>
+      <stop offset="1" stop-color="#3730A3"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#card-bg)"/>
+
+  <!-- Subtle grid -->
+  <g opacity="0.04">
+    <line x1="0" y1="0" x2="0" y2="630" stroke="white" stroke-width="1"/>
+    <line x1="120" y1="0" x2="120" y2="630" stroke="white" stroke-width="1"/>
+    <line x1="240" y1="0" x2="240" y2="630" stroke="white" stroke-width="1"/>
+    <line x1="360" y1="0" x2="360" y2="630" stroke="white" stroke-width="1"/>
+    <line x1="480" y1="0" x2="480" y2="630" stroke="white" stroke-width="1"/>
+    <line x1="600" y1="0" x2="600" y2="630" stroke="white" stroke-width="1"/>
+    <line x1="720" y1="0" x2="720" y2="630" stroke="white" stroke-width="1"/>
+    <line x1="840" y1="0" x2="840" y2="630" stroke="white" stroke-width="1"/>
+    <line x1="960" y1="0" x2="960" y2="630" stroke="white" stroke-width="1"/>
+    <line x1="1080" y1="0" x2="1080" y2="630" stroke="white" stroke-width="1"/>
+    <line x1="0" y1="0" x2="1200" y2="0" stroke="white" stroke-width="1"/>
+    <line x1="0" y1="126" x2="1200" y2="126" stroke="white" stroke-width="1"/>
+    <line x1="0" y1="252" x2="1200" y2="252" stroke="white" stroke-width="1"/>
+    <line x1="0" y1="378" x2="1200" y2="378" stroke="white" stroke-width="1"/>
+    <line x1="0" y1="504" x2="1200" y2="504" stroke="white" stroke-width="1"/>
+  </g>
+
+  <!-- Top accent line -->
+  <rect y="0" width="1200" height="3" fill="#6366F1"/>
+
+  <!-- Centered icon -->
+  <g transform="translate(520 140)">
+    <rect width="160" height="160" rx="36" fill="url(#icon-g)"/>
+    <path
+      d="M40 61C40 47 50 37 64 37H100C114 37 124 47 124 61V82C124 96 114 106 100 106H88L72 121C69 124 64 122 64 119V106H64C50 106 40 96 40 82V61Z"
+      fill="white"
+    />
+    <rect x="56" y="60" width="48" height="6" rx="3" fill="#4338CA" fill-opacity="0.7"/>
+    <rect x="56" y="73" width="32" height="6" rx="3" fill="#4338CA" fill-opacity="0.35"/>
+  </g>
+
+  <!-- App name bar -->
+  <rect x="460" y="330" width="280" height="10" rx="5" fill="white" fill-opacity="0.6"/>
+  <!-- Tagline bar -->
+  <rect x="400" y="356" width="400" height="6" rx="3" fill="white" fill-opacity="0.2"/>
+
+  <!-- Feature dots -->
+  <g transform="translate(572 394)">
+    <circle cx="0" cy="0" r="3" fill="#6366F1" fill-opacity="0.6"/>
+    <circle cx="20" cy="0" r="3" fill="#818CF8" fill-opacity="0.6"/>
+    <circle cx="40" cy="0" r="3" fill="#A5B4FC" fill-opacity="0.6"/>
+  </g>
+</svg>

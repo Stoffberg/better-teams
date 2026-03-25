@@ -1,0 +1,12 @@
+node_modules/
+dist/
+out/
+.vite/
+coverage/
+src-tauri/target/
+assets/branding/generated/
+playwright-report/
+test-results/
+*.dmg
+*.zip
+.DS_Store

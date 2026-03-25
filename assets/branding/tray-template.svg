@@ -1,0 +1,11 @@
+<svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Two-person silhouette matching the app icon, template style for macOS menu bar -->
+
+  <!-- Back person (smaller, left) -->
+  <circle cx="8" cy="7.5" r="2.8" fill="black" fill-opacity="0.55"/>
+  <path d="M8 11C5.8 11 4 12.8 4 15V17.2C4 17.6 4.4 18 4.8 18H11.2C11.6 18 12 17.6 12 17.2V15C12 12.8 10.2 11 8 11Z" fill="black" fill-opacity="0.55"/>
+
+  <!-- Front person (larger, right, overlapping) -->
+  <circle cx="13.5" cy="6.5" r="3.4" fill="black"/>
+  <path d="M13.5 10.6C10.9 10.6 8.8 12.7 8.8 15.3V17.8C8.8 18.3 9.2 18.7 9.7 18.7H17.3C17.8 18.7 18.2 18.3 18.2 17.8V15.3C18.2 12.7 16.1 10.6 13.5 10.6Z" fill="black"/>
+</svg>
