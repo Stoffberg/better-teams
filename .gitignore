@@ -4,6 +4,7 @@ out/
 .vite/
 coverage/
 src-tauri/target/
+src-tauri/gen/
 assets/branding/generated/
 playwright-report/
 test-results/
