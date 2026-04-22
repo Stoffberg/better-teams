@@ -28,6 +28,9 @@ const PRESENCE_BATCH_SIZE = 50;
 const SELF_AVAILABILITY_HEARTBEAT_MS = 60_000;
 const PROFILE_QUERY_GC_MS = 5 * 60_000;
 const RESUME_COOLDOWN_MS = 3_000;
+const EMPTY_CONVERSATIONS: Conversation[] = [];
+const EMPTY_MESSAGES: Message[] = [];
+const EMPTY_PRESENCE_BY_MRI: Record<string, PresenceInfo> = {};
 
 function uniqueMris(mris: string[]): string[] {
   const unique = new Map<string, string>();
@@ -176,7 +179,7 @@ export function useTeamsConversations(liveSessionReady: boolean): {
 
   return {
     tenantId: activeTenantId,
-    conversations: query.data ?? [],
+    conversations: query.data ?? EMPTY_CONVERSATIONS,
     isPending: query.isPending,
     isFetching: query.isFetching,
     isError: query.isError,
@@ -201,7 +204,7 @@ export function useTeamsProfilePresentation(args: {
 }) {
   const { activeTenantId } = useTeamsAccountContext();
   const deferredConversations = useDeferredValue(args.conversations);
-  const deferredMessages = useDeferredValue(args.messages ?? []);
+  const deferredMessages = useDeferredValue(args.messages ?? EMPTY_MESSAGES);
   const profileMris = useMemo(
     () =>
       collectProfileAvatarMris({
@@ -250,8 +253,12 @@ export function useTeamsProfilePresentation(args: {
     retryDelay: (attempt) => Math.min(2000 * 2 ** attempt, 12_000),
   });
 
-  return normalizeProfilePresentation(
-    backgroundAvatarQuery.data ?? priorityAvatarQuery.data,
+  const profilePresentationData =
+    backgroundAvatarQuery.data ?? priorityAvatarQuery.data;
+
+  return useMemo(
+    () => normalizeProfilePresentation(profilePresentationData),
+    [profilePresentationData],
   );
 }
 
@@ -304,7 +311,7 @@ export function useTeamsPresence(args: {
   const documentVisible = useDocumentVisibility();
   const resumeReady = useResumeCooldown();
   const deferredConversations = useDeferredValue(args.conversations);
-  const deferredMessages = useDeferredValue(args.messages ?? []);
+  const deferredMessages = useDeferredValue(args.messages ?? EMPTY_MESSAGES);
   const presenceMris = useMemo(
     () =>
       uniqueMris(
@@ -335,7 +342,7 @@ export function useTeamsPresence(args: {
     retry: 1,
   });
 
-  return query.data ?? {};
+  return query.data ?? EMPTY_PRESENCE_BY_MRI;
 }
 
 export function useMaintainTeamsAvailability(enabled: boolean) {

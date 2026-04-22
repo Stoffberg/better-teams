@@ -139,6 +139,7 @@ function TenantScopedWorkspace() {
   const pendingSelectionMeasureRef = useRef<ReturnType<
     typeof beginPerfMeasure
   > | null>(null);
+  const activeConversationIdRef = useRef<string | null>(null);
 
   const activitySortedConversations = useMemo(
     () =>
@@ -381,6 +382,7 @@ function TenantScopedWorkspace() {
       ? selectedId
       : null;
   }, [conversations, selectedId]);
+  activeConversationIdRef.current = activeConversationId;
   const openConversationRequest = useQuery({
     queryKey: ["open-conversation-request"],
     queryFn: async () => null as string | null,
@@ -578,41 +580,41 @@ function TenantScopedWorkspace() {
     pendingSelectionMeasureRef.current = null;
   }, [activeConversationId, selectionFocusTarget]);
 
-  const handleSelectConversation = (
-    id: string,
-    focus: "sidebar" | "thread" | "composer",
-  ) => {
-    const item = sidebarItemById[id];
-    if (liveSessionReady) {
-      void queryClient.prefetchQuery({
-        queryKey: teamsKeys.thread(activeTenantId, id),
-        queryFn: () =>
-          preloadConversationThread(activeTenantId ?? undefined, id, 60_000),
-        staleTime: 25_000,
-      });
-    }
-    recordPerfMetric("workspace.selectConversation.requested", {
-      conversationId: id,
-      focusTarget: focus,
-    });
-    pendingSelectionMeasureRef.current = beginPerfMeasure(
-      "workspace.selectConversation",
-      {
+  const handleSelectConversation = useCallback(
+    (id: string, focus: "sidebar" | "thread" | "composer") => {
+      const item = sidebarItemById[id];
+      if (liveSessionReady) {
+        void queryClient.prefetchQuery({
+          queryKey: teamsKeys.thread(activeTenantId, id),
+          queryFn: () =>
+            preloadConversationThread(activeTenantId ?? undefined, id, 60_000),
+          staleTime: 25_000,
+        });
+      }
+      recordPerfMetric("workspace.selectConversation.requested", {
         conversationId: id,
         focusTarget: focus,
-      },
-    );
-    setPendingSelectedId(id);
-    setSelectionFocusTarget(focus);
-    startTransition(() => {
-      setSelectedId(id);
-      setPendingSelectedId(null);
-      setThreadSearchQuery("");
-      setThreadSearchResultCount(0);
-      setAnnouncement(item ? `Opened ${item.title}` : "Opened conversation");
-      setIsProfilePanelOpen(false);
-    });
-  };
+      });
+      pendingSelectionMeasureRef.current = beginPerfMeasure(
+        "workspace.selectConversation",
+        {
+          conversationId: id,
+          focusTarget: focus,
+        },
+      );
+      setPendingSelectedId(id);
+      setSelectionFocusTarget(focus);
+      startTransition(() => {
+        setSelectedId(id);
+        setPendingSelectedId(null);
+        setThreadSearchQuery("");
+        setThreadSearchResultCount(0);
+        setAnnouncement(item ? `Opened ${item.title}` : "Opened conversation");
+        setIsProfilePanelOpen(false);
+      });
+    },
+    [activeTenantId, liveSessionReady, queryClient, sidebarItemById],
+  );
 
   useEffect(
     () => () => {
@@ -625,7 +627,12 @@ function TenantScopedWorkspace() {
 
   const handleHoverConversation = useCallback(
     (conversationId: string) => {
-      if (!liveSessionReady || conversationId === activeConversationId) return;
+      if (
+        !liveSessionReady ||
+        conversationId === activeConversationIdRef.current
+      ) {
+        return;
+      }
       if (hoverPrefetchTimeoutsRef.current[conversationId]) return;
       const cachedThreadState = queryClient.getQueryState(
         teamsKeys.thread(activeTenantId, conversationId),
@@ -653,7 +660,7 @@ function TenantScopedWorkspace() {
         120,
       );
     },
-    [liveSessionReady, activeConversationId, activeTenantId, queryClient],
+    [liveSessionReady, activeTenantId, queryClient],
   );
   const handleHoverConversationEnd = useCallback((conversationId: string) => {
     const timeoutId = hoverPrefetchTimeoutsRef.current[conversationId];
@@ -662,11 +669,12 @@ function TenantScopedWorkspace() {
     delete hoverPrefetchTimeoutsRef.current[conversationId];
   }, []);
 
+  const { mutate: mutateFavorite } = favoriteMutation;
   const handleToggleFavorite = useCallback(
     (conversationId: string, favorite: boolean) => {
-      favoriteMutation.mutate({ conversationId, favorite });
+      mutateFavorite({ conversationId, favorite });
     },
-    [favoriteMutation],
+    [mutateFavorite],
   );
 
   if (sessionQuery.isPending && !session) {

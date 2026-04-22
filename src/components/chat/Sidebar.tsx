@@ -68,8 +68,7 @@ function ConversationRow({
   onHoverEnd,
   onKeyDown,
   registerRef,
-  index,
-  activeConversationId,
+  tabbable,
   children,
   action,
 }: {
@@ -80,8 +79,7 @@ function ConversationRow({
   onHoverEnd: () => void;
   onKeyDown: (e: React.KeyboardEvent<HTMLButtonElement>) => void;
   registerRef: (node: HTMLButtonElement | null) => void;
-  index: number;
-  activeConversationId: string | null;
+  tabbable: boolean;
   children: React.ReactNode;
   action?: React.ReactNode;
 }) {
@@ -92,7 +90,7 @@ function ConversationRow({
         data-conversation-id={item.id}
         type="button"
         aria-current={active ? "true" : undefined}
-        tabIndex={active || (!activeConversationId && index === 0) ? 0 : -1}
+        tabIndex={tabbable ? 0 : -1}
         aria-label={conversationAriaLabel(item)}
         onClick={onClick}
         onPointerEnter={onHoverStart}
@@ -126,8 +124,7 @@ const ChannelItem = React.memo(function ChannelItem({
   onHoverEnd,
   onKeyDown,
   registerRef,
-  index,
-  activeConversationId,
+  tabbable,
   onToggleFavorite,
 }: {
   item: SidebarConversationItem;
@@ -137,8 +134,7 @@ const ChannelItem = React.memo(function ChannelItem({
   onHoverEnd: (conversationId: string) => void;
   onKeyDown: (e: React.KeyboardEvent<HTMLButtonElement>, id: string) => void;
   registerRef: React.RefObject<Record<string, HTMLButtonElement | null>>;
-  index: number;
-  activeConversationId: string | null;
+  tabbable: boolean;
   onToggleFavorite: (conversationId: string, favorite: boolean) => void;
 }) {
   const isMeeting = item.kind === "meeting";
@@ -174,8 +170,7 @@ const ChannelItem = React.memo(function ChannelItem({
       onHoverEnd={handleHoverEnd}
       onKeyDown={handleKeyDown}
       registerRef={handleRegisterRef}
-      index={index}
-      activeConversationId={activeConversationId}
+      tabbable={tabbable}
       action={
         <button
           type="button"
@@ -218,8 +213,7 @@ const DMItem = React.memo(function DMItem({
   onHoverEnd,
   onKeyDown,
   registerRef,
-  index,
-  activeConversationId,
+  tabbable,
   onToggleFavorite,
 }: {
   item: SidebarConversationItem;
@@ -230,8 +224,7 @@ const DMItem = React.memo(function DMItem({
   onHoverEnd: (conversationId: string) => void;
   onKeyDown: (e: React.KeyboardEvent<HTMLButtonElement>, id: string) => void;
   registerRef: React.RefObject<Record<string, HTMLButtonElement | null>>;
-  index: number;
-  activeConversationId: string | null;
+  tabbable: boolean;
   onToggleFavorite: (conversationId: string, favorite: boolean) => void;
 }) {
   const [imgFailed, setImgFailed] = useState(false);
@@ -267,8 +260,7 @@ const DMItem = React.memo(function DMItem({
       onHoverEnd={handleHoverEnd}
       onKeyDown={handleKeyDown}
       registerRef={handleRegisterRef}
-      index={index}
-      activeConversationId={activeConversationId}
+      tabbable={tabbable}
       action={
         <button
           type="button"
@@ -362,6 +354,8 @@ export function Sidebar({
   const conversationRowRefs = useRef<Record<string, HTMLButtonElement | null>>(
     {},
   );
+  const activeConversationIdRef = useRef<string | null>(activeConversationId);
+  const filteredItemsRef = useRef<SidebarConversationItem[]>([]);
 
   const filteredSidebarItems = useMemo(() => {
     const q = deferredQuery.trim().toLowerCase();
@@ -374,6 +368,8 @@ export function Sidebar({
     }
     return { items, favoriteCount };
   }, [allSidebarItems, deferredQuery]);
+  activeConversationIdRef.current = activeConversationId;
+  filteredItemsRef.current = filteredSidebarItems.items;
 
   const openConversation = useCallback(
     (
@@ -387,16 +383,17 @@ export function Sidebar({
 
   const moveConversationSelection = useCallback(
     (direction: "next" | "prev") => {
-      const ids = filteredSidebarItems.items.map((i) => i.id);
+      const ids = filteredItemsRef.current.map((i) => i.id);
       if (ids.length === 0) return;
-      const cur = activeConversationId ? ids.indexOf(activeConversationId) : -1;
+      const currentId = activeConversationIdRef.current;
+      const cur = currentId ? ids.indexOf(currentId) : -1;
       let next = 0;
       if (cur < 0) next = direction === "prev" ? ids.length - 1 : 0;
       else if (direction === "next") next = Math.min(cur + 1, ids.length - 1);
       else next = Math.max(cur - 1, 0);
       openConversation(ids[next], "sidebar");
     },
-    [activeConversationId, openConversation, filteredSidebarItems],
+    [openConversation],
   );
 
   const onConversationKeyDown = useCallback(
@@ -598,6 +595,10 @@ export function Sidebar({
                   <DMItem
                     item={item}
                     active={item.id === activeConversationId}
+                    tabbable={
+                      item.id === activeConversationId ||
+                      (!activeConversationId && index === 0)
+                    }
                     presence={
                       item.avatarMri ? presenceByMri[item.avatarMri] : undefined
                     }
@@ -606,8 +607,6 @@ export function Sidebar({
                     onHoverEnd={onHoverConversationEnd}
                     onKeyDown={onConversationKeyDown}
                     registerRef={conversationRowRefs}
-                    index={index}
-                    activeConversationId={activeConversationId}
                     onToggleFavorite={onToggleFavorite}
                   />
                 </div>
@@ -622,13 +621,15 @@ export function Sidebar({
                   <ChannelItem
                     item={item}
                     active={item.id === activeConversationId}
+                    tabbable={
+                      item.id === activeConversationId ||
+                      (!activeConversationId && index === 0)
+                    }
                     onSelect={openConversation}
                     onHoverStart={onHoverConversationStart}
                     onHoverEnd={onHoverConversationEnd}
                     onKeyDown={onConversationKeyDown}
                     registerRef={conversationRowRefs}
-                    index={index}
-                    activeConversationId={activeConversationId}
                     onToggleFavorite={onToggleFavorite}
                   />
                 </div>
