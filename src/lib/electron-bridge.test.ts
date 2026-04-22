@@ -2,17 +2,35 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const invokeMock = vi.fn();
 
-vi.mock("@tauri-apps/api/core", () => ({
-  convertFileSrc: vi.fn((path: string) => `asset://${path}`),
-  invoke: invokeMock,
-}));
-
-describe("tauri-bridge", () => {
+describe("electron-bridge", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-03-25T00:00:00Z"));
     vi.resetModules();
     vi.clearAllMocks();
+    window.betterTeams = {
+      teams: {
+        extractTokens: vi.fn(),
+        getAuthToken: vi.fn(),
+        getAvailableAccounts: vi.fn(),
+        getCachedPresence: invokeMock,
+      },
+      images: {
+        cacheImageFile: vi.fn(),
+        removeCachedImageFiles: vi.fn(),
+        filePathToAssetUrl: vi.fn((path: string) => `asset://${path}`),
+      },
+      sqlite: {
+        execute: vi.fn(),
+        select: vi.fn(),
+      },
+      http: {
+        fetch: vi.fn(),
+      },
+      shell: {
+        openExternal: vi.fn(),
+      },
+    };
   });
 
   afterEach(() => {
@@ -27,7 +45,7 @@ describe("tauri-bridge", () => {
       },
     ]);
 
-    const { getCachedPresence } = await import("./tauri-bridge");
+    const { getCachedPresence } = await import("./electron-bridge");
 
     const first = await getCachedPresence(["8:orgid:one"]);
     const second = await getCachedPresence(["8:orgid:one"]);
@@ -47,7 +65,7 @@ describe("tauri-bridge", () => {
     });
     invokeMock.mockImplementation(() => pendingRequest);
 
-    const { getCachedPresence } = await import("./tauri-bridge");
+    const { getCachedPresence } = await import("./electron-bridge");
 
     const first = getCachedPresence(["8:orgid:one", "8:orgid:two"]);
     const second = getCachedPresence(["8:orgid:two", "8:orgid:one"]);
@@ -84,7 +102,7 @@ describe("tauri-bridge", () => {
         },
       ]);
 
-    const { getCachedPresence } = await import("./tauri-bridge");
+    const { getCachedPresence } = await import("./electron-bridge");
 
     await getCachedPresence(["8:orgid:one"]);
     vi.advanceTimersByTime(15_001);

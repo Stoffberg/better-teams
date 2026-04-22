@@ -6,12 +6,12 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { getCachedPresence } from "@/lib/electron-bridge";
 import {
   type CachedProfileLookup,
   SqliteProfileCache,
   SqliteWorkspaceShellStore,
 } from "@/lib/sqlite-cache";
-import { getCachedPresence } from "@/lib/tauri-bridge";
 import { getOrCreateClient } from "@/lib/teams-client-factory";
 import {
   canonAvatarMri,

@@ -4,7 +4,7 @@ const fetchMock = vi.fn();
 const initializeMock = vi.fn();
 const apiClientConstructor = vi.fn();
 
-vi.mock("@tauri-apps/plugin-http", () => ({
+vi.mock("@/lib/electron-fetch", () => ({
   fetch: fetchMock,
 }));
 

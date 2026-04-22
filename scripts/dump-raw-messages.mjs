@@ -1,6 +1,6 @@
 /**
  * Standalone script to dump raw messages from Teams API.
- * Does NOT depend on Tauri — extracts tokens directly from the cookie store.
+ * Extracts tokens directly from the cookie store.
  */
 
 import { execSync } from "node:child_process";

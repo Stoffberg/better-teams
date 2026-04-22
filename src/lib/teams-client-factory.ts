@@ -1,14 +1,4 @@
-/**
- * Manages tenant-scoped TeamsApiClient instances in the webview.
- *
- * Replaces the `tenantClients` Map and `getTenantClient()` pattern
- * from the old Electron `teams-ipc.ts` handler.
- *
- * Uses `@tauri-apps/plugin-http`'s fetch for CORS-free HTTP requests
- * and the SQLite image cache for avatar caching.
- */
-
-import { fetch } from "@tauri-apps/plugin-http";
+import { fetch } from "@/lib/electron-fetch";
 import { SqliteImageCache } from "@/lib/sqlite-cache";
 import {
   TeamsApiClient,
@@ -64,7 +54,6 @@ function createClient(tenantId?: string): TeamsApiClient {
             ? input.url
             : String(input);
 
-    // Inject Origin + Referer so Teams CORS checks pass
     const headers = new Headers(init?.headers);
     if (!headers.has("Origin")) headers.set("Origin", TEAMS_ORIGIN);
     if (!headers.has("Referer")) headers.set("Referer", `${TEAMS_ORIGIN}/`);

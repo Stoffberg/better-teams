@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { cacheImageFile, filePathToAssetUrl } from "@/lib/tauri-bridge";
+import { cacheImageFile, filePathToAssetUrl } from "@/lib/electron-bridge";
 import { TeamsApiClient } from "./api-client";
 
-vi.mock("@/lib/tauri-bridge", () => ({
+vi.mock("@/lib/electron-bridge", () => ({
   cacheImageFile: vi.fn(),
   extractTokens: vi.fn().mockResolvedValue([]),
   filePathToAssetUrl: vi.fn((filePath: string) => `asset://${filePath}`),

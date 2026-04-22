@@ -1,12 +1,3 @@
-/**
- * Thin wrapper around Tauri `invoke()` for token extraction commands.
- *
- * These mirror the Rust commands in `src-tauri/src/commands/token.rs`
- * and replace the Electron IPC calls that previously went through
- * `window.betterTeams.teams.*`.
- */
-
-import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import type {
   ExtractedToken,
   PresenceInfo,
@@ -23,33 +14,20 @@ const cachedPresenceRequests = new Map<
   Promise<Record<string, PresenceInfo>>
 >();
 
-/**
- * Extract all valid (non-expired) Teams auth tokens from the local
- * Teams cookie store, sorted by expiry descending.
- */
 export async function extractTokens(): Promise<ExtractedToken[]> {
-  const raw = await invoke<RawExtractedToken[]>("extract_tokens");
+  const raw = await api().teams.extractTokens();
   return raw.map(hydrateToken);
 }
 
-/**
- * Get the best available auth token (Bearer token for api.spaces.skype.com).
- * Optionally filtered to a specific tenant.
- */
 export async function getAuthToken(
   tenantId?: string,
 ): Promise<ExtractedToken | null> {
-  const raw = await invoke<RawExtractedToken | null>("get_auth_token", {
-    tenantId: tenantId ?? null,
-  });
+  const raw = await api().teams.getAuthToken(tenantId ?? null);
   return raw ? hydrateToken(raw) : null;
 }
 
-/**
- * Get all available Teams accounts (deduplicated across tenants).
- */
 export async function getAvailableAccounts(): Promise<TeamsAccountOption[]> {
-  return invoke<TeamsAccountOption[]>("get_available_accounts");
+  return api().teams.getAvailableAccounts();
 }
 
 export async function getCachedPresence(
@@ -81,9 +59,8 @@ export async function getCachedPresence(
   const requestKey = missingMris.slice().sort().join("\x1f");
   let request = cachedPresenceRequests.get(requestKey);
   if (!request) {
-    request = invoke<RawCachedPresenceEntry[]>("get_cached_presence", {
-      userMris: missingMris,
-    })
+    request = api()
+      .teams.getCachedPresence(missingMris)
       .then((entries) => {
         const fresh = Object.fromEntries(
           entries.map((entry) => [
@@ -111,38 +88,32 @@ export async function cacheImageFile(
   bytes: Uint8Array,
   extension?: string,
 ): Promise<string> {
-  return invoke<string>("cache_image_file", {
-    cacheKey,
-    bytes: Array.from(bytes),
-    extension: extension ?? null,
-  });
+  return api().images.cacheImageFile(cacheKey, bytes, extension ?? null);
 }
 
 export async function removeCachedImageFiles(paths: string[]): Promise<void> {
   if (paths.length === 0) return;
-  await invoke("remove_cached_image_files", { paths });
+  await api().images.removeCachedImageFiles(paths);
 }
 
 export function filePathToAssetUrl(filePath: string): string {
-  return convertFileSrc(filePath);
+  return api().images.filePathToAssetUrl(filePath);
 }
 
-// ── Internal ──
-
-/** The token as it arrives from Rust (expiresAt is an ISO string). */
 type RawExtractedToken = Omit<ExtractedToken, "expiresAt"> & {
   expiresAt: string;
 };
 
-type RawCachedPresenceEntry = {
-  mri: string;
-  presence: PresenceInfo;
-};
-
-/** Convert the ISO-string `expiresAt` from Rust into a JS `Date`. */
 function hydrateToken(raw: RawExtractedToken): ExtractedToken {
   return {
     ...raw,
     expiresAt: new Date(raw.expiresAt),
   };
+}
+
+function api(): BetterTeamsDesktopApi {
+  if (!window.betterTeams) {
+    throw new Error("Better Teams desktop API is not available");
+  }
+  return window.betterTeams;
 }

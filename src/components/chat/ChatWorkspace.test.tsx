@@ -14,7 +14,7 @@ vi.mock("@/lib/teams-thread-preload", async () => {
   };
 });
 
-vi.mock("@/lib/tauri-bridge", () => ({
+vi.mock("@/lib/electron-bridge", () => ({
   cacheImageFile: vi.fn(),
   extractTokens: vi.fn().mockResolvedValue([]),
   filePathToAssetUrl: vi.fn((filePath: string) => `asset://${filePath}`),
@@ -734,7 +734,7 @@ describe("ChatWorkspace", () => {
       }),
     });
 
-    const { extractTokens } = await import("@/lib/tauri-bridge");
+    const { extractTokens } = await import("@/lib/electron-bridge");
     vi.mocked(extractTokens).mockResolvedValue([
       {
         host: ".teams.microsoft.com",
@@ -829,7 +829,7 @@ describe("ChatWorkspace", () => {
       }),
     });
 
-    const { extractTokens } = await import("@/lib/tauri-bridge");
+    const { extractTokens } = await import("@/lib/electron-bridge");
     vi.mocked(extractTokens).mockResolvedValue([
       {
         host: ".teams.microsoft.com",

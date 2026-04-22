@@ -20,7 +20,7 @@ import {
   extractTokens,
   filePathToAssetUrl,
   getAuthToken,
-} from "@/lib/tauri-bridge";
+} from "@/lib/electron-bridge";
 import {
   applyProfileDisplayNameToRowMrIs,
   applyProfilePhotoDataUrlToRowMrIs,

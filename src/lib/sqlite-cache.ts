@@ -1,14 +1,5 @@
-/**
- * SQLite-backed cache layer replacing the three JSON file caches
- * (TeamsProfileCache, TeamsImageResponseCache, TeamsWorkspaceShellStore)
- * and the IndexedDB React Query persister.
- *
- * Uses `@tauri-apps/plugin-sql` which provides a Database class with
- * `execute()` and `select()` methods backed by a local SQLite file.
- */
-
-import Database from "@tauri-apps/plugin-sql";
-import { removeCachedImageFiles } from "@/lib/tauri-bridge";
+import { removeCachedImageFiles } from "@/lib/electron-bridge";
+import Database from "@/lib/electron-sqlite";
 import { canonAvatarMri } from "@/lib/teams-profile-avatars";
 import type { ThreadQueryData } from "@/lib/teams-thread-query";
 import type {
@@ -19,8 +10,6 @@ import type {
   TeamsWorkspaceShellSnapshot,
   TeamsWorkspaceShellTenantSnapshot,
 } from "@/services/teams/types";
-
-// ── Singleton DB ──
 
 let dbPromise: Promise<Database> | null = null;
 let writeQueue = Promise.resolve();
@@ -173,10 +162,6 @@ async function initSchema(db: Database): Promise<void> {
   `);
 }
 
-// ════════════════════════════════════════════════
-//  Profile Cache
-// ════════════════════════════════════════════════
-
 const MAX_PROFILE_ENTRIES = 5_000;
 const PROFILE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const NEGATIVE_AVATAR_TTL_MS = 12 * 60 * 60 * 1000;
@@ -285,7 +270,6 @@ export const SqliteProfileCache = {
       }
     }
 
-    // Batch UPDATE last_requested_at for all found MRIs in a single query
     if (foundMris.length > 0) {
       const updatePlaceholders = foundMris
         .map((_, i) => `$${i + 2}`)
@@ -381,13 +365,8 @@ export const SqliteProfileCache = {
   },
 };
 
-// ════════════════════════════════════════════════
-//  Image Cache
-// ════════════════════════════════════════════════
-
 const MAX_IMAGE_ENTRIES = 2_000;
 
-// Debounce last_used_at updates: collect URLs and flush every 5 seconds
 const _pendingImageLastUsedUrls = new Set<string>();
 let _imageLastUsedTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -414,7 +393,6 @@ function scheduleImageLastUsedFlush(): void {
   }, 5_000);
 }
 
-// Counter for throttling image cache pruning
 let _imageCacheInsertCount = 0;
 
 type ImageRow = {
@@ -491,10 +469,6 @@ export const SqliteImageCache = {
   },
 };
 
-// ════════════════════════════════════════════════
-//  Workspace Shell Store
-// ════════════════════════════════════════════════
-
 const MAX_CONVERSATIONS = 50;
 const MAX_THREAD_ENTRIES = 150;
 const THREAD_CACHE_TTL_MS = 2 * 60 * 1000;
@@ -517,7 +491,6 @@ export const SqliteWorkspaceShellStore = {
   async getSnapshot(): Promise<TeamsWorkspaceShellSnapshot | null> {
     const db = await getDb();
 
-    // Read accounts
     const accountRows = await db.select<{ key: string; value: string }[]>(
       "SELECT value FROM workspace_shell WHERE key = 'accounts'",
     );
@@ -525,7 +498,6 @@ export const SqliteWorkspaceShellStore = {
       ? (JSON.parse(accountRows[0].value) as TeamsAccountOption[])
       : [];
 
-    // Read all tenant snapshots
     const tenantRows = await db.select<
       { key: string; value: string; updated_at: number }[]
     >(
@@ -537,7 +509,6 @@ export const SqliteWorkspaceShellStore = {
     const sessionSuffix = ":session";
     const convSuffix = ":conversations";
 
-    // Group by tenant ID
     const tenantData = new Map<
       string,
       {
@@ -628,7 +599,6 @@ export const SqliteWorkspaceShellStore = {
   },
 };
 
-// Counter for throttling thread cache pruning
 let _threadCacheStoreCount = 0;
 
 export const SqliteThreadCache = {
@@ -710,10 +680,6 @@ export const SqliteThreadCache = {
     });
   },
 };
-
-// ════════════════════════════════════════════════
-//  React Query Persister (replaces idb-keyval)
-// ════════════════════════════════════════════════
 
 export const SqliteQueryPersister = {
   getStorage() {

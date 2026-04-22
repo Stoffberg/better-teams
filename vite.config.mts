@@ -6,8 +6,6 @@ import { defineConfig } from "vite";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const host = process.env.TAURI_DEV_HOST;
-
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
@@ -19,31 +17,23 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
-    host: host || false,
-    hmr: host
-      ? {
-          protocol: "ws",
-          host,
-          port: 5174,
-        }
-      : undefined,
+    host: "127.0.0.1",
     watch: {
       ignored: [
         "**/coverage/**",
+        "**/electron/**",
         "**/*.test.ts",
         "**/*.test.tsx",
         "**/e2e/**",
         "**/playwright-report/**",
-        "**/src-tauri/**",
       ],
     },
   },
-  envPrefix: ["VITE_", "TAURI_ENV_*"],
+  envPrefix: ["VITE_"],
   build: {
     outDir: "dist",
-    target:
-      process.env.TAURI_ENV_PLATFORM === "windows" ? "chrome105" : "safari14",
-    minify: !process.env.TAURI_ENV_DEBUG ? "esbuild" : false,
-    sourcemap: !!process.env.TAURI_ENV_DEBUG,
+    target: "chrome120",
+    minify: "esbuild",
+    sourcemap: false,
   },
 });

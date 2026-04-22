@@ -5,7 +5,7 @@ import { ChatWorkspace } from "@/components/chat/ChatWorkspace";
 import { TeamsAccountProvider } from "@/providers/TeamsAccountProvider";
 import { ThemeProvider } from "@/providers/ThemeProvider";
 
-// Mock the teams-client-factory and tauri-bridge modules
+// Mock the teams-client-factory and electron-bridge modules
 vi.mock("@/lib/teams-client-factory", () => ({
   getOrCreateClient: vi.fn().mockResolvedValue({
     initialize: vi.fn().mockResolvedValue(undefined),
@@ -34,7 +34,7 @@ vi.mock("@/lib/teams-client-factory", () => ({
   clearClientCache: vi.fn(),
 }));
 
-vi.mock("@/lib/tauri-bridge", () => ({
+vi.mock("@/lib/electron-bridge", () => ({
   cacheImageFile: vi.fn(),
   extractTokens: vi.fn().mockResolvedValue([
     {
