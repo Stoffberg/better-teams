@@ -40,7 +40,6 @@ export default defineConfig({
   },
   envPrefix: ["VITE_"],
   build: {
-    outDir: "dist",
     target: "chrome120",
     minify: "esbuild",
     sourcemap: false,
