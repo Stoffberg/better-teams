@@ -1446,13 +1446,12 @@ describe("ChatWorkspace", () => {
       await screen.findByLabelText("View profile: Siphesihle Thomo"),
     );
     expect(
-      await screen.findByRole("dialog", {
-        name: "Profile: Siphesihle Thomo",
-      }),
+      await screen.findByText("Siphesihle Thomo's profile"),
     ).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  it("keeps the DM profile drawer closed until requested from the thread header", async () => {
+  it("keeps the DM profile sidebar closed until requested from the thread header", async () => {
     const dmMessage = baseMessage({
       id: "m-dm",
       from: "8:orgid:peer-123",
@@ -1544,7 +1543,7 @@ describe("ChatWorkspace", () => {
     expect(await screen.findByText("Pat Lee's profile")).toBeInTheDocument();
   });
 
-  it("shows other chats with the same person in the profile drawer", async () => {
+  it("shows other chats with the same person in the profile sidebar", async () => {
     const dmMessage = baseMessage({
       id: "m-dm-shared",
       from: "8:orgid:peer-123",

@@ -70,10 +70,13 @@ describe("ProfileSidebar", () => {
 });
 
 describe("ProfileTrigger", () => {
-  it("portals the profile drawer to the document body", () => {
+  it("uses the shared profile opener instead of rendering its own drawer", () => {
+    const onOpenProfile = vi.fn();
+    const profile = makeProfile();
+
     render(
       <div data-testid="host">
-        <ProfileTrigger profile={makeProfile()}>
+        <ProfileTrigger profile={profile} onOpenProfile={onOpenProfile}>
           <span>Open profile</span>
         </ProfileTrigger>
       </div>,
@@ -81,11 +84,7 @@ describe("ProfileTrigger", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /view profile/i }));
 
-    const dialog = screen.getByRole("dialog", {
-      name: "Profile: Alex Johnson",
-    });
-
-    expect(dialog.parentElement).toBe(document.body);
-    expect(screen.getByTestId("host")).not.toContainElement(dialog);
+    expect(onOpenProfile).toHaveBeenCalledWith(profile);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 });

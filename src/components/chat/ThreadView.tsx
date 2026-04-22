@@ -195,6 +195,7 @@ type ThreadViewProps = {
     string,
     NonNullable<ProfileData["sharedConversations"]>
   >;
+  onOpenProfile?: (profile: ProfileData) => void;
 };
 
 export function profileMessageConversationId(
@@ -229,6 +230,7 @@ export const ThreadView = forwardRef<ThreadViewHandle, ThreadViewProps>(
       tenantNameByMri,
       locationByMri,
       sharedConversationsByMri,
+      onOpenProfile,
     },
     ref,
   ) => {
@@ -1162,6 +1164,7 @@ export const ThreadView = forwardRef<ThreadViewHandle, ThreadViewProps>(
                         onOpenMessageRef={openMessageRef}
                         onDeleteMessage={handleDeleteMessage}
                         getMentionProfile={mentionProfileForPart}
+                        onOpenProfile={onOpenProfile}
                       />
                     );
                   })()

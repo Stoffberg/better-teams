@@ -16,7 +16,6 @@ import {
   type ReactNode,
   useState,
 } from "react";
-import { createPortal } from "react-dom";
 import { initialsFromLabel } from "@/lib/chat-format";
 import { presenceDescription } from "@/lib/teams-presence";
 import { cn } from "@/lib/utils";
@@ -392,12 +391,13 @@ export function ProfileSidebar({
 export function ProfileTrigger({
   profile,
   children,
+  onOpenProfile,
 }: {
   profile: ProfileData | null;
   children: ReactNode;
+  onOpenProfile?: (profile: ProfileData) => void;
 }) {
   const [showCard, setShowCard] = useState(false);
-  const [showModal, setShowModal] = useState(false);
   const [hoverTimer, setHoverTimer] = useState<ReturnType<
     typeof setTimeout
   > | null>(null);
@@ -423,72 +423,41 @@ export function ProfileTrigger({
       clearTimeout(hoverTimer);
       setHoverTimer(null);
     }
-    setShowModal(true);
+    onOpenProfile?.(profile);
   };
 
   return (
-    <>
-      <button
-        type="button"
-        className="relative inline-flex cursor-pointer appearance-none border-none bg-transparent p-0 text-left outline-none"
-        onPointerEnter={startHover}
-        onPointerLeave={endHover}
-        onClick={handleClick}
-        aria-label={`View profile: ${profile.displayName}`}
-      >
-        {children}
-        {showCard ? (
-          <span
-            className={cn(
-              "absolute left-0 top-full z-40 mt-2 w-72 overflow-hidden rounded-2xl border border-border/80 bg-background/95 p-0 shadow-xl backdrop-blur",
-              "animate-in fade-in-0 zoom-in-95 duration-150",
-            )}
-          >
-            <div className="border-b border-border/70 bg-gradient-to-b from-accent/60 to-background px-3 py-3">
-              <HoverProfileCard profile={profile} />
-            </div>
-            <div className="space-y-2 px-3 py-2.5">
-              {profile.email ? (
-                <div className="truncate text-[12px] text-muted-foreground">
-                  {profile.email}
-                </div>
-              ) : null}
-              <div className="text-[11px] font-medium text-muted-foreground/70">
-                Click to open full profile
+    <button
+      type="button"
+      className="relative inline-flex cursor-pointer appearance-none border-none bg-transparent p-0 text-left outline-none"
+      onPointerEnter={startHover}
+      onPointerLeave={endHover}
+      onClick={handleClick}
+      aria-label={`View profile: ${profile.displayName}`}
+    >
+      {children}
+      {showCard ? (
+        <span
+          className={cn(
+            "absolute left-0 top-full z-40 mt-2 w-72 overflow-hidden rounded-2xl border border-border/80 bg-background/95 p-0 shadow-xl backdrop-blur",
+            "animate-in fade-in-0 zoom-in-95 duration-150",
+          )}
+        >
+          <div className="border-b border-border/70 bg-gradient-to-b from-accent/60 to-background px-3 py-3">
+            <HoverProfileCard profile={profile} />
+          </div>
+          <div className="space-y-2 px-3 py-2.5">
+            {profile.email ? (
+              <div className="truncate text-[12px] text-muted-foreground">
+                {profile.email}
               </div>
+            ) : null}
+            <div className="text-[11px] font-medium text-muted-foreground/70">
+              Click to open full profile
             </div>
-          </span>
-        ) : null}
-      </button>
-      {showModal
-        ? createPortal(
-            <div
-              role="dialog"
-              aria-modal="true"
-              aria-label={`Profile: ${profile.displayName}`}
-              className="fixed inset-0 z-50 flex justify-end"
-              onClick={() => setShowModal(false)}
-              onKeyDown={(e) => {
-                if (e.key === "Escape") setShowModal(false);
-              }}
-            >
-              <div
-                className="fixed inset-0 bg-foreground/10 backdrop-blur-[3px] animate-in fade-in-0 duration-200"
-                aria-hidden="true"
-              />
-              <ProfileSidebar
-                profile={profile}
-                onClose={() => setShowModal(false)}
-                closeLabel="Close profile"
-                role="document"
-                className="relative z-10 h-full w-full max-w-sm shadow-xl animate-in slide-in-from-right duration-200"
-                onClick={(e) => e.stopPropagation()}
-                onKeyDown={(e) => e.stopPropagation()}
-              />
-            </div>,
-            document.body,
-          )
-        : null}
-    </>
+          </div>
+        </span>
+      ) : null}
+    </button>
   );
 }

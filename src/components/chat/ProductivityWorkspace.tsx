@@ -150,7 +150,8 @@ function TenantScopedWorkspace() {
     null,
   );
   const [announcement, setAnnouncement] = useState("");
-  const [isProfileSidebarOpen, setIsProfileSidebarOpen] = useState(false);
+  const [profileSidebarProfile, setProfileSidebarProfile] =
+    useState<ProfileData | null>(null);
   const [threadSearchQuery, setThreadSearchQuery] = useState("");
   const [threadSearchResultCount, setThreadSearchResultCount] = useState(0);
   const [selectionFocusTarget, setSelectionFocusTarget] = useState<
@@ -301,11 +302,7 @@ function TenantScopedWorkspace() {
       ),
     [allSidebarItems],
   );
-  const selectedSidebarItem = selectedId
-    ? (sidebarItemById[selectedId] ?? null)
-    : null;
-  const selectedProfileMri =
-    selectedSidebarItem?.kind === "dm" ? selectedSidebarItem.avatarMri : null;
+  const profileSidebarMri = profileSidebarProfile?.mri ?? null;
   const sharedConversationCandidateIds = useMemo(
     () =>
       allSidebarItems
@@ -319,7 +316,7 @@ function TenantScopedWorkspace() {
       "teams",
       "shared-thread-members",
       activeTenantId ?? "__default__",
-      selectedProfileMri ?? "__none__",
+      profileSidebarMri ?? "__none__",
       sharedConversationCandidateIds.join("\x1f"),
     ],
     queryFn: async () => {
@@ -381,9 +378,7 @@ function TenantScopedWorkspace() {
       return byConversationId;
     },
     enabled:
-      isProfileSidebarOpen &&
-      Boolean(selectedProfileMri) &&
-      sharedConversationCandidateIds.length > 0,
+      Boolean(profileSidebarMri) && sharedConversationCandidateIds.length > 0,
     staleTime: 5 * 60_000,
   });
   const detailedSharedConversationById =
@@ -454,14 +449,14 @@ function TenantScopedWorkspace() {
               setAnnouncement(
                 `Ready to message ${displayNameByMri[mri] || selectedItem.title}`,
               );
-              setIsProfileSidebarOpen(false);
+              setProfileSidebarProfile(null);
             },
       onOpenConversation: (conversationId: string) => {
         const item = sidebarItemById[conversationId];
         setSelectedId(conversationId);
         setSelectionFocusTarget("thread");
         setAnnouncement(item ? `Opened ${item.title}` : "Opened conversation");
-        setIsProfileSidebarOpen(false);
+        setProfileSidebarProfile(null);
       },
       currentConversationId: selectedItem.id,
       sharedConversationHeading: `Other chats with ${displayNameByMri[mri] || selectedItem.title}`,
@@ -479,6 +474,62 @@ function TenantScopedWorkspace() {
     presenceByMri,
     selectedItem,
     sidebarItemById,
+    sharedConversationsByMri,
+    tenantNameByMri,
+  ]);
+  const profileSidebarData = useMemo<ProfileData | null>(() => {
+    if (!profileSidebarProfile) return null;
+    const mri = profileSidebarProfile.mri;
+    const displayName =
+      displayNameByMri[mri] || profileSidebarProfile.displayName;
+    const onOpenConversation = profileSidebarProfile.onOpenConversation
+      ? (conversationId: string) => {
+          profileSidebarProfile.onOpenConversation?.(conversationId);
+          setProfileSidebarProfile(null);
+        }
+      : undefined;
+    const onMessage = profileSidebarProfile.onMessage
+      ? () => {
+          profileSidebarProfile.onMessage?.();
+          setProfileSidebarProfile(null);
+        }
+      : undefined;
+
+    return {
+      ...profileSidebarProfile,
+      displayName,
+      avatarThumbSrc:
+        avatarThumbByMri[mri] ?? profileSidebarProfile.avatarThumbSrc,
+      avatarFullSrc:
+        avatarFullByMri[mri] ??
+        avatarThumbByMri[mri] ??
+        profileSidebarProfile.avatarFullSrc,
+      email: emailByMri[mri] ?? profileSidebarProfile.email,
+      jobTitle: jobTitleByMri[mri] ?? profileSidebarProfile.jobTitle,
+      department: departmentByMri[mri] ?? profileSidebarProfile.department,
+      companyName: companyNameByMri[mri] ?? profileSidebarProfile.companyName,
+      tenantName: tenantNameByMri[mri] ?? profileSidebarProfile.tenantName,
+      location: locationByMri[mri] ?? profileSidebarProfile.location,
+      presence: presenceByMri[mri] ?? profileSidebarProfile.presence,
+      onOpenConversation,
+      onMessage,
+      sharedConversationHeading: `Other chats with ${displayName}`,
+      sharedConversations:
+        sharedConversationsByMri[mri] ??
+        profileSidebarProfile.sharedConversations ??
+        [],
+    };
+  }, [
+    avatarFullByMri,
+    avatarThumbByMri,
+    companyNameByMri,
+    departmentByMri,
+    displayNameByMri,
+    emailByMri,
+    jobTitleByMri,
+    locationByMri,
+    presenceByMri,
+    profileSidebarProfile,
     sharedConversationsByMri,
     tenantNameByMri,
   ]);
@@ -639,7 +690,7 @@ function TenantScopedWorkspace() {
         setThreadSearchQuery("");
         setThreadSearchResultCount(0);
         setAnnouncement(item ? `Opened ${item.title}` : "Opened conversation");
-        setIsProfileSidebarOpen(false);
+        setProfileSidebarProfile(null);
       });
     },
     [activeTenantId, liveSessionReady, queryClient, sidebarItemById],
@@ -821,7 +872,7 @@ function TenantScopedWorkspace() {
                 presenceByMri={presenceByMri}
                 onOpenProfile={
                   selectedProfileData
-                    ? () => setIsProfileSidebarOpen(true)
+                    ? () => setProfileSidebarProfile(selectedProfileData)
                     : undefined
                 }
                 profileButtonLabel={
@@ -874,6 +925,7 @@ function TenantScopedWorkspace() {
                   tenantNameByMri={tenantNameByMri}
                   locationByMri={locationByMri}
                   sharedConversationsByMri={sharedConversationsByMri}
+                  onOpenProfile={setProfileSidebarProfile}
                 />
               </PerfProfiler>
               <PerfProfiler
@@ -902,11 +954,11 @@ function TenantScopedWorkspace() {
           )}
         </main>
 
-        {isProfileSidebarOpen && selectedProfileData ? (
+        {profileSidebarData ? (
           <ProfileSidebar
-            profile={selectedProfileData}
+            profile={profileSidebarData}
             closeLabel="Close profile sidebar"
-            onClose={() => setIsProfileSidebarOpen(false)}
+            onClose={() => setProfileSidebarProfile(null)}
           />
         ) : null}
       </div>

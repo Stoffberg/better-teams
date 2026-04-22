@@ -580,10 +580,12 @@ function RichText({
   parts,
   onOpenMessageRef,
   getMentionProfile,
+  onOpenProfile,
 }: {
   parts: MessageInlinePart[];
   onOpenMessageRef?: (conversationId: string, messageId: string) => void;
   getMentionProfile?: (part: MessageInlinePart) => ProfileData | null;
+  onOpenProfile?: (profile: ProfileData) => void;
 }) {
   // Split parts into segments: runs of inline parts vs code blocks
   const segments: Array<
@@ -644,6 +646,7 @@ function RichText({
             parts={segment.parts}
             onOpenMessageRef={onOpenMessageRef}
             getMentionProfile={getMentionProfile}
+            onOpenProfile={onOpenProfile}
           />
         );
       })}
@@ -655,10 +658,12 @@ function InlineRichText({
   parts,
   onOpenMessageRef,
   getMentionProfile,
+  onOpenProfile,
 }: {
   parts: MessageInlinePart[];
   onOpenMessageRef?: (conversationId: string, messageId: string) => void;
   getMentionProfile?: (part: MessageInlinePart) => ProfileData | null;
+  onOpenProfile?: (profile: ProfileData) => void;
 }) {
   const handleExternalClick = useOpenExternal();
   const lines: Array<{
@@ -765,7 +770,11 @@ function InlineRichText({
               );
               const profile = getMentionProfile?.(part) ?? null;
               return profile ? (
-                <ProfileTrigger key={part.key} profile={profile}>
+                <ProfileTrigger
+                  key={part.key}
+                  profile={profile}
+                  onOpenProfile={onOpenProfile}
+                >
                   {mention}
                 </ProfileTrigger>
               ) : (
@@ -805,11 +814,13 @@ function QuoteBlock({
   quoteRef,
   onOpenMessageRef,
   getMentionProfile,
+  onOpenProfile,
 }: {
   parts: MessageInlinePart[];
   quoteRef?: MessageReference | null;
   onOpenMessageRef?: (conversationId: string, messageId: string) => void;
   getMentionProfile?: (part: MessageInlinePart) => ProfileData | null;
+  onOpenProfile?: (profile: ProfileData) => void;
 }) {
   const split = splitInlinePartsAtNewline(parts);
   const firstLine = split ? inlineText(split.before) : inlineText(parts);
@@ -826,6 +837,7 @@ function QuoteBlock({
             parts={author}
             onOpenMessageRef={onOpenMessageRef}
             getMentionProfile={getMentionProfile}
+            onOpenProfile={onOpenProfile}
           />
         </p>
       ) : null}
@@ -834,6 +846,7 @@ function QuoteBlock({
           parts={body}
           onOpenMessageRef={onOpenMessageRef}
           getMentionProfile={getMentionProfile}
+          onOpenProfile={onOpenProfile}
         />
       </p>
     </div>
@@ -940,6 +953,7 @@ export function messageRowPropsEqual(
     prev.onOpenMessageRef === next.onOpenMessageRef &&
     prev.onDeleteMessage === next.onDeleteMessage &&
     prev.getMentionProfile === next.getMentionProfile &&
+    prev.onOpenProfile === next.onOpenProfile &&
     sameProfile(prev.profile, next.profile)
   );
 }
@@ -955,6 +969,7 @@ function MessageRowComponent({
   onOpenMessageRef,
   onDeleteMessage,
   getMentionProfile,
+  onOpenProfile,
 }: {
   entry: DisplayMessage;
   avatarSrc?: string;
@@ -966,6 +981,7 @@ function MessageRowComponent({
   onOpenMessageRef?: (conversationId: string, messageId: string) => void;
   onDeleteMessage?: (conversationId: string, messageId: string) => void;
   getMentionProfile?: (part: MessageInlinePart) => ProfileData | null;
+  onOpenProfile?: (profile: ProfileData) => void;
 }) {
   return (
     <li
@@ -984,7 +1000,10 @@ function MessageRowComponent({
         {/* Avatar column */}
         <div className={cn("w-14 shrink-0", showMeta ? "pt-0.5" : "pt-1")}>
           {showMeta ? (
-            <ProfileTrigger profile={profile ?? null}>
+            <ProfileTrigger
+              profile={profile ?? null}
+              onOpenProfile={onOpenProfile}
+            >
               <MsgAvatar
                 src={avatarSrc}
                 name={entry.displayName}
@@ -1002,7 +1021,10 @@ function MessageRowComponent({
         <div className="min-w-0 flex-1">
           {showMeta ? (
             <div className="flex items-baseline gap-2 pb-0.5">
-              <ProfileTrigger profile={profile ?? null}>
+              <ProfileTrigger
+                profile={profile ?? null}
+                onOpenProfile={onOpenProfile}
+              >
                 <span
                   className={cn(
                     "text-[15px] font-bold leading-snug tracking-[-0.01em] transition-colors hover:underline",
@@ -1045,6 +1067,7 @@ function MessageRowComponent({
                   quoteRef={entry.parts.quoteRef}
                   onOpenMessageRef={onOpenMessageRef}
                   getMentionProfile={getMentionProfile}
+                  onOpenProfile={onOpenProfile}
                 />
               ) : null}
               {entry.parts.attachments.map((att) => (
@@ -1062,6 +1085,7 @@ function MessageRowComponent({
                     parts={entry.parts.body}
                     onOpenMessageRef={onOpenMessageRef}
                     getMentionProfile={getMentionProfile}
+                    onOpenProfile={onOpenProfile}
                   />
                 </div>
               ) : null}
