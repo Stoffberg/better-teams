@@ -129,7 +129,7 @@ export function collectProfileAvatarMris(input: {
 
   for (const c of input.conversations) {
     push(dmConversationAvatarMri(c, input.selfSkypeId));
-    if (conversationChatKind(c) === "dm" && Array.isArray(c.members)) {
+    if (Array.isArray(c.members)) {
       for (const member of c.members) {
         push(member.id);
       }

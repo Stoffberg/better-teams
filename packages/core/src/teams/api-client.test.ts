@@ -7,6 +7,12 @@ const filePathToAssetUrl = vi.fn((filePath: string) => `asset://${filePath}`);
 const getCachedImageFile = vi.fn();
 const hasCachedImageFile = vi.fn();
 
+function arrayBufferFromHex(hex: string): ArrayBuffer {
+  return Uint8Array.from(hex.match(/.{2}/g) ?? [], (byte) =>
+    Number.parseInt(byte, 16),
+  ).buffer;
+}
+
 beforeEach(() => {
   cacheImageFile.mockReset();
   filePathToAssetUrl.mockClear();
@@ -363,6 +369,90 @@ describe("TeamsApiClient.sendAttachmentMessage", () => {
 });
 
 describe("TeamsApiClient profile image caching", () => {
+  it("does not request Teams-generated placeholder profile pictures", async () => {
+    const client = new TeamsApiClient(undefined);
+    Reflect.set(client, "regionGtms", {
+      middleTier: "https://teams.microsoft.com/api/mt/part/amer-03",
+    });
+
+    const urls = Reflect.get(client, "profilePictureUrlCandidates").call(
+      client,
+      "8:orgid:daniel",
+      "full",
+    );
+
+    expect(urls).toEqual([
+      "https://teams.microsoft.com/api/mt/part/amer-03/v1/users/8%3Aorgid%3Adaniel/profilePicture?size=HR360x360",
+      "https://teams.microsoft.com/api/mt/part/amer-03/v1/users/8%3Aorgid%3Adaniel/profilePicture?size=HR96x96",
+    ]);
+    expect(urls.join(" ")).not.toContain("displayName=TeamsUser");
+  });
+
+  it("ignores stale cached TeamsUser placeholder profile pictures", async () => {
+    vi.mocked(getCachedImageFile).mockResolvedValueOnce("/tmp/avatar-t.jpg");
+    const fetchImpl = vi.fn();
+    const client = new TeamsApiClient(undefined, {
+      fetchImpl,
+    });
+    Reflect.set(client, "authToken", {
+      token: "bearer-token",
+      expiresAt: new Date("2999-01-01T00:00:00Z"),
+    });
+    Reflect.set(client, "skypeToken", "skype-token");
+    Reflect.set(client, "regionGtms", {
+      middleTier: "https://teams.microsoft.com/api/mt/part/amer-03",
+    });
+
+    const imageSrc = await Reflect.get(
+      client,
+      "fetchAuthenticatedImageSrc",
+    ).call(
+      client,
+      "https://teams.microsoft.com/api/mt/part/amer-03/v1/users/8%3Aorgid%3Adaniel/profilePicture?displayName=TeamsUser&size=HR360x360",
+    );
+
+    expect(imageSrc).toBeNull();
+    expect(getCachedImageFile).not.toHaveBeenCalled();
+    expect(hasCachedImageFile).not.toHaveBeenCalled();
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("does not cache known generated profile silhouettes", async () => {
+    const digestSpy = vi
+      .spyOn(globalThis.crypto.subtle, "digest")
+      .mockResolvedValueOnce(
+        arrayBufferFromHex("9dc28272dd6e1beb3f813965f79d5aa0d357ceaa"),
+      );
+    const fetchImpl = vi.fn().mockResolvedValue(
+      new Response(Uint8Array.from([0xff, 0xd8, 0xff, 0xdb]), {
+        status: 200,
+        headers: {
+          "content-type": "image/jpeg",
+        },
+      }),
+    );
+    const client = new TeamsApiClient(undefined, {
+      fetchImpl,
+    });
+    Reflect.set(client, "authToken", {
+      token: "bearer-token",
+      expiresAt: new Date("2999-01-01T00:00:00Z"),
+    });
+    Reflect.set(client, "skypeToken", "skype-token");
+    Reflect.set(client, "regionGtms", {
+      middleTier: "https://teams.microsoft.com/api/mt/part/amer-03",
+    });
+
+    const imageSrc = await Reflect.get(
+      client,
+      "fetchAuthenticatedImageSrc",
+    ).call(client, "https://cdn.example.com/avatar.jpg");
+
+    expect(imageSrc).toBeNull();
+    expect(cacheImageFile).not.toHaveBeenCalled();
+    digestSpy.mockRestore();
+  });
+
   it("returns cached image paths as asset urls without refetching", async () => {
     vi.mocked(getCachedImageFile).mockResolvedValueOnce("/tmp/avatar.png");
     vi.mocked(hasCachedImageFile).mockResolvedValueOnce(true);
@@ -386,7 +476,7 @@ describe("TeamsApiClient profile image caching", () => {
 
     expect(imageSrc).toBe("asset:///tmp/avatar.png");
     expect(getCachedImageFile).toHaveBeenCalledWith(
-      "https://cdn.example.com/avatar.png",
+      "profile-image-v4:https://cdn.example.com/avatar.png",
     );
     expect(hasCachedImageFile).toHaveBeenCalledWith("/tmp/avatar.png");
     expect(filePathToAssetUrl).toHaveBeenCalledWith("/tmp/avatar.png");
@@ -427,7 +517,7 @@ describe("TeamsApiClient profile image caching", () => {
     expect(hasCachedImageFile).toHaveBeenCalledWith("/tmp/avatar-stale.jpg");
     expect(fetchImpl).toHaveBeenCalled();
     expect(cacheImageFile).toHaveBeenCalledWith(
-      "https://cdn.example.com/avatar.jpg",
+      "profile-image-v4:https://cdn.example.com/avatar.jpg",
       expect.any(Uint8Array),
       "jpg",
     );
@@ -462,7 +552,7 @@ describe("TeamsApiClient profile image caching", () => {
     ).call(client, "https://cdn.example.com/avatar.jpg");
 
     expect(cacheImageFile).toHaveBeenCalledWith(
-      "https://cdn.example.com/avatar.jpg",
+      "profile-image-v4:https://cdn.example.com/avatar.jpg",
       expect.any(Uint8Array),
       "jpg",
     );

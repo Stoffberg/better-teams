@@ -67,6 +67,37 @@ describe("ProfileSidebar", () => {
     expect(screen.getByText("OTHER CHATS")).toBeInTheDocument();
     expect(screen.queryByText(/^8$/)).not.toBeInTheDocument();
   });
+
+  it("shows a skeleton while other chats load", () => {
+    render(
+      <ProfileSidebar
+        profile={makeProfile({ sharedConversationsLoading: true })}
+        onClose={() => undefined}
+      />,
+    );
+
+    const heading = screen.getByText("OTHER CHATS");
+    const section = heading.closest("[aria-busy='true']");
+
+    expect(heading).toBeInTheDocument();
+    expect(section).toBeTruthy();
+    expect(section?.querySelectorAll(".animate-pulse")).toHaveLength(8);
+  });
+
+  it("does not show initials while avatar fallback is not ready", () => {
+    render(
+      <ProfileSidebar
+        profile={makeProfile({
+          displayName: "Daniel Makanda",
+          avatarFallbackReady: false,
+        })}
+        onClose={() => undefined}
+      />,
+    );
+
+    expect(screen.getByText("Daniel Makanda's profile")).toBeInTheDocument();
+    expect(screen.queryByText("DM")).not.toBeInTheDocument();
+  });
 });
 
 describe("ProfileTrigger", () => {

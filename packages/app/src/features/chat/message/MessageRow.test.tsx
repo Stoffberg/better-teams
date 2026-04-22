@@ -198,6 +198,37 @@ describe("MessageRow", () => {
     expect(screen.getByText("Loaded rich content")).toBeInTheDocument();
   });
 
+  it("keeps the avatar slot empty while fallback is not ready", () => {
+    renderMessageRow(
+      <MessageRow
+        entry={{
+          ...makeEntry(),
+          displayName: "Daniel Makanda",
+        }}
+        showMeta
+        avatarFallbackReady={false}
+      />,
+    );
+
+    expect(screen.getByText("Daniel Makanda")).toBeInTheDocument();
+    expect(screen.queryByText("DM")).not.toBeInTheDocument();
+  });
+
+  it("shows initials after fallback is ready", () => {
+    renderMessageRow(
+      <MessageRow
+        entry={{
+          ...makeEntry(),
+          displayName: "Daniel Makanda",
+        }}
+        showMeta
+        avatarFallbackReady
+      />,
+    );
+
+    expect(screen.getByText("DM")).toBeInTheDocument();
+  });
+
   it("renders attachment frames immediately for stable media rows", () => {
     renderMessageRow(
       <MessageRow

@@ -1,7 +1,10 @@
 import { useTeamsAccountContext } from "@better-teams/app/providers/TeamsAccountProvider";
 import { teamsProfileService } from "@better-teams/app/services/teams/profile";
 import { teamsKeys } from "@better-teams/app/services/teams/query-keys";
-import { collectProfileAvatarMris } from "@better-teams/core/teams/profile/avatars";
+import {
+  canonAvatarMri,
+  collectProfileAvatarMris,
+} from "@better-teams/core/teams/profile/avatars";
 import { TeamsProfilePresentationSchema } from "@better-teams/core/teams/schemas";
 import type {
   Conversation,
@@ -14,6 +17,26 @@ import { useDeferredValue, useMemo } from "react";
 const PRIORITY_AVATAR_CONVERSATIONS = 12;
 const PROFILE_QUERY_GC_MS = 5 * 60_000;
 const EMPTY_MESSAGES: Message[] = [];
+
+export type TeamsProfilePresentationState = TeamsProfilePresentation & {
+  avatarFallbackReady: boolean;
+};
+
+const EMPTY_PROFILE_PRESENTATION: TeamsProfilePresentation = {
+  avatarThumbs: {},
+  avatarFull: {},
+  displayNames: {},
+  emails: {},
+  jobTitles: {},
+  departments: {},
+  companyNames: {},
+  tenantNames: {},
+  locations: {},
+};
+const profilePersonCacheByTenant = new Map<
+  string,
+  Map<string, TeamsProfilePresentation>
+>();
 
 function normalizeProfilePresentation(data: unknown): TeamsProfilePresentation {
   const parsed = TeamsProfilePresentationSchema.safeParse(data);
@@ -49,11 +72,132 @@ async function fetchProfiles(
   return teamsProfileService.fetchPresentation(tenantId, mris);
 }
 
+function mergeProfilePresentations(
+  presentations: unknown[],
+): TeamsProfilePresentation {
+  return presentations.reduce<TeamsProfilePresentation>((merged, data) => {
+    const next = normalizeProfilePresentation(data);
+    return {
+      avatarThumbs: { ...merged.avatarThumbs, ...next.avatarThumbs },
+      avatarFull: { ...merged.avatarFull, ...next.avatarFull },
+      displayNames: { ...merged.displayNames, ...next.displayNames },
+      emails: { ...merged.emails, ...next.emails },
+      jobTitles: { ...merged.jobTitles, ...next.jobTitles },
+      departments: { ...merged.departments, ...next.departments },
+      companyNames: { ...merged.companyNames, ...next.companyNames },
+      tenantNames: { ...merged.tenantNames, ...next.tenantNames },
+      locations: { ...merged.locations, ...next.locations },
+    };
+  }, EMPTY_PROFILE_PRESENTATION);
+}
+
+function profilePresentationForMri(
+  presentation: TeamsProfilePresentation,
+  mri: string,
+): TeamsProfilePresentation {
+  const key = canonAvatarMri(mri);
+  const pick = (record: Record<string, string>) =>
+    record[key] ? { [key]: record[key] } : {};
+  return {
+    avatarThumbs: pick(presentation.avatarThumbs),
+    avatarFull: pick(presentation.avatarFull),
+    displayNames: pick(presentation.displayNames),
+    emails: pick(presentation.emails),
+    jobTitles: pick(presentation.jobTitles),
+    departments: pick(presentation.departments),
+    companyNames: pick(presentation.companyNames),
+    tenantNames: pick(presentation.tenantNames),
+    locations: pick(presentation.locations),
+  };
+}
+
+function tenantProfilePersonCache(tenantId: string | null | undefined) {
+  const tenantKey = tenantId ?? "__default__";
+  let cache = profilePersonCacheByTenant.get(tenantKey);
+  if (!cache) {
+    cache = new Map();
+    profilePersonCacheByTenant.set(tenantKey, cache);
+  }
+  return cache;
+}
+
+function readProfilePersonCache(
+  tenantId: string | null | undefined,
+  mris: string[],
+): {
+  presentation: TeamsProfilePresentation;
+  missingMris: string[];
+} {
+  const cache = tenantProfilePersonCache(tenantId);
+  const cached: TeamsProfilePresentation[] = [];
+  const missingMris: string[] = [];
+  const seen = new Set<string>();
+
+  for (const mri of mris) {
+    const normalizedMri = canonAvatarMri(mri);
+    if (!normalizedMri || seen.has(normalizedMri)) continue;
+    seen.add(normalizedMri);
+    const data = cache.get(normalizedMri);
+    if (data === undefined) {
+      missingMris.push(mri);
+    } else {
+      cached.push(data);
+    }
+  }
+
+  return {
+    presentation: mergeProfilePresentations(cached),
+    missingMris,
+  };
+}
+
+function seedProfilePersonCache(
+  tenantId: string | null | undefined,
+  mris: string[],
+  data: unknown,
+) {
+  const cache = tenantProfilePersonCache(tenantId);
+  const presentation = normalizeProfilePresentation(data);
+  const seen = new Set<string>();
+
+  for (const mri of mris) {
+    const normalizedMri = canonAvatarMri(mri);
+    if (!normalizedMri || seen.has(normalizedMri)) continue;
+    seen.add(normalizedMri);
+    const personPresentation = profilePresentationForMri(
+      presentation,
+      normalizedMri,
+    );
+    cache.set(
+      normalizedMri,
+      mergeProfilePresentations([cache.get(normalizedMri), personPresentation]),
+    );
+  }
+}
+
+async function fetchProfilesWithPersonCache({
+  tenantId,
+  mris,
+}: {
+  tenantId: string | null | undefined;
+  mris: string[];
+}): Promise<TeamsProfilePresentation> {
+  const cached = readProfilePersonCache(tenantId, mris);
+  if (cached.missingMris.length === 0) return cached.presentation;
+
+  const fetched = await fetchProfiles(
+    tenantId ?? undefined,
+    cached.missingMris,
+  );
+  seedProfilePersonCache(tenantId, cached.missingMris, fetched);
+  return mergeProfilePresentations([cached.presentation, fetched]);
+}
+
 export function useTeamsProfilePresentation(args: {
   conversations: Conversation[];
   messages?: Message[];
   selfSkypeId?: string;
-}) {
+}): TeamsProfilePresentationState {
   const { activeTenantId } = useTeamsAccountContext();
   const deferredConversations = useDeferredValue(args.conversations);
   const deferredMessages = useDeferredValue(args.messages ?? EMPTY_MESSAGES);
@@ -78,21 +222,41 @@ export function useTeamsProfilePresentation(args: {
     () => [...priorityProfileMris].sort().join("\x1f"),
     [priorityProfileMris],
   );
+  const priorityPersonCache = useMemo(
+    () => readProfilePersonCache(activeTenantId, priorityProfileMris),
+    [activeTenantId, priorityProfileMris],
+  );
+  const profilePersonCache = useMemo(
+    () => readProfilePersonCache(activeTenantId, profileMris),
+    [activeTenantId, profileMris],
+  );
 
   const priorityAvatarQuery = useQuery({
     queryKey: teamsKeys.profileAvatars(activeTenantId, prioritySignature),
-    queryFn: () => fetchProfiles(activeTenantId, priorityProfileMris),
+    queryFn: () =>
+      fetchProfilesWithPersonCache({
+        tenantId: activeTenantId,
+        mris: priorityProfileMris,
+      }),
     enabled: Boolean(activeTenantId) && priorityProfileMris.length > 0,
     staleTime: 3_600_000,
     gcTime: PROFILE_QUERY_GC_MS,
-    placeholderData: (previousData) => previousData,
+    placeholderData: (previousData) =>
+      mergeProfilePresentations([
+        priorityPersonCache.presentation,
+        previousData,
+      ]),
     retry: 2,
     retryDelay: (attempt) => Math.min(2000 * 2 ** attempt, 12_000),
   });
 
   const backgroundAvatarQuery = useQuery({
     queryKey: teamsKeys.profileAvatars(activeTenantId, profileMriSignature),
-    queryFn: () => fetchProfiles(activeTenantId, profileMris),
+    queryFn: () =>
+      fetchProfilesWithPersonCache({
+        tenantId: activeTenantId,
+        mris: profileMris,
+      }),
     enabled:
       Boolean(activeTenantId) &&
       profileMris.length > 0 &&
@@ -100,16 +264,58 @@ export function useTeamsProfilePresentation(args: {
       priorityAvatarQuery.isSuccess,
     staleTime: 3_600_000,
     gcTime: PROFILE_QUERY_GC_MS,
-    placeholderData: () => priorityAvatarQuery.data,
+    placeholderData: () =>
+      mergeProfilePresentations([
+        profilePersonCache.presentation,
+        priorityAvatarQuery.data,
+      ]),
     retry: 2,
     retryDelay: (attempt) => Math.min(2000 * 2 ** attempt, 12_000),
   });
 
-  const profilePresentationData =
-    backgroundAvatarQuery.data ?? priorityAvatarQuery.data;
+  const profilePresentationData = useMemo(
+    () =>
+      mergeProfilePresentations([
+        profilePersonCache.presentation,
+        priorityAvatarQuery.data,
+        backgroundAvatarQuery.data,
+      ]),
+    [
+      backgroundAvatarQuery.data,
+      priorityAvatarQuery.data,
+      profilePersonCache.presentation,
+    ],
+  );
+  const priorityAvatarPending =
+    Boolean(activeTenantId) &&
+    priorityProfileMris.length > 0 &&
+    (priorityAvatarQuery.isPending || priorityAvatarQuery.isFetching);
+  const backgroundAvatarPending =
+    Boolean(activeTenantId) &&
+    profileMris.length > 0 &&
+    profileMriSignature !== prioritySignature &&
+    priorityAvatarQuery.isSuccess &&
+    (backgroundAvatarQuery.isPending || backgroundAvatarQuery.isFetching);
+  const profilePersonCacheComplete =
+    profilePersonCache.missingMris.length === 0;
 
-  return useMemo(
+  const profilePresentation = useMemo(
     () => normalizeProfilePresentation(profilePresentationData),
     [profilePresentationData],
+  );
+
+  return useMemo(
+    () => ({
+      ...profilePresentation,
+      avatarFallbackReady:
+        profilePersonCacheComplete ||
+        (!priorityAvatarPending && !backgroundAvatarPending),
+    }),
+    [
+      backgroundAvatarPending,
+      priorityAvatarPending,
+      profilePersonCacheComplete,
+      profilePresentation,
+    ],
   );
 }

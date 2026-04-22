@@ -1,4 +1,3 @@
-import { initialsFromLabel } from "@better-teams/core/chat";
 import type {
   PresenceInfo,
   TeamsAccountOption,
@@ -36,6 +35,7 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { avatarFallbackPresentation } from "../avatar/avatar-fallback";
 import { PresenceBadge } from "../presence/PresenceBadge";
 import type { SidebarConversationItem } from "../thread/types";
 
@@ -258,6 +258,7 @@ const DMItem = React.memo(function DMItem({
   item,
   active,
   presence,
+  avatarFallbackReady = true,
   onSelect,
   onHoverStart,
   onHoverEnd,
@@ -269,6 +270,7 @@ const DMItem = React.memo(function DMItem({
   item: SidebarConversationItem;
   active: boolean;
   presence?: PresenceInfo | null;
+  avatarFallbackReady?: boolean;
   onSelect: (id: string, focus: "sidebar" | "thread" | "composer") => void;
   onHoverStart: (conversationId: string) => void;
   onHoverEnd: (conversationId: string) => void;
@@ -278,6 +280,11 @@ const DMItem = React.memo(function DMItem({
   onToggleFavorite: (conversationId: string, favorite: boolean) => void;
 }) {
   const [imgFailed, setImgFailed] = useState(false);
+  const fallback = avatarFallbackPresentation(item.title);
+  const showPresence =
+    Boolean(item.avatarThumbSrc && !imgFailed) ||
+    avatarFallbackReady ||
+    imgFailed;
   const handleClick = useCallback(
     () => onSelect(item.id, "thread"),
     [item.id, onSelect],
@@ -337,16 +344,23 @@ const DMItem = React.memo(function DMItem({
             onError={() => setImgFailed(true)}
             className="size-5 rounded-md object-cover"
           />
+        ) : !avatarFallbackReady && !imgFailed ? (
+          <span className="block size-5 rounded-md" aria-hidden />
         ) : (
-          <span className="flex size-5 items-center justify-center rounded-md bg-sidebar-accent text-[9px] font-semibold text-sidebar-muted">
-            {initialsFromLabel(item.title)}
+          <span
+            className="flex size-5 items-center justify-center rounded-md text-[9px] font-semibold"
+            style={fallback.style}
+          >
+            {fallback.initials}
           </span>
         )}
-        <PresenceBadge
-          presence={presence}
-          size="sm"
-          className="rounded-sm ring-sidebar"
-        />
+        {showPresence ? (
+          <PresenceBadge
+            presence={presence}
+            size="sm"
+            className="size-2 rounded-sm ring-sidebar"
+          />
+        ) : null}
       </span>
       <span className="min-w-0 flex-1 truncate">{item.title}</span>
     </ConversationRow>
@@ -355,6 +369,7 @@ const DMItem = React.memo(function DMItem({
 
 export function Sidebar({
   upn,
+  selfDisplayName,
   selfAvatarSrc: _selfAvatarSrc,
   accountAvatarByTenant,
   presenceByMri,
@@ -371,8 +386,10 @@ export function Sidebar({
   searchInputRef,
   accountLoading = false,
   conversationsLoading = false,
+  avatarFallbackReady = true,
 }: {
   upn?: string;
+  selfDisplayName?: string;
   selfAvatarSrc?: string;
   accountAvatarByTenant: Record<string, string>;
   presenceByMri: Record<string, PresenceInfo>;
@@ -392,6 +409,7 @@ export function Sidebar({
   searchInputRef: React.RefObject<HTMLInputElement | null>;
   accountLoading?: boolean;
   conversationsLoading?: boolean;
+  avatarFallbackReady?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query);
@@ -403,6 +421,10 @@ export function Sidebar({
     [accounts, activeTenantId, upn],
   );
   const activeWorkspaceLabel = workspaceLabelFromUpn(activeAccount?.upn ?? upn);
+  const activeSelfAvatarLabel = selfDisplayName?.trim() || activeWorkspaceLabel;
+  const activeWorkspaceFallback = avatarFallbackPresentation(
+    activeSelfAvatarLabel,
+  );
   const activeEmail = activeAccount?.upn ?? upn ?? "Unknown account";
 
   const conversationRowRefs = useRef<Record<string, HTMLButtonElement | null>>(
@@ -534,9 +556,14 @@ export function Sidebar({
               >
                 <Avatar className="size-10 border border-sidebar-border bg-sidebar-accent">
                   <AvatarImage src={_selfAvatarSrc} alt={activeEmail} />
-                  <AvatarFallback className="bg-sidebar-accent text-[12px] font-semibold text-sidebar-foreground">
-                    {initialsFromLabel(activeWorkspaceLabel)}
-                  </AvatarFallback>
+                  {avatarFallbackReady ? (
+                    <AvatarFallback
+                      className="text-[12px] font-semibold"
+                      style={activeWorkspaceFallback.style}
+                    >
+                      {activeWorkspaceFallback.initials}
+                    </AvatarFallback>
+                  ) : null}
                 </Avatar>
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-1.5">
@@ -565,38 +592,58 @@ export function Sidebar({
                   onSwitchAccount(value === "__default__" ? null : value)
                 }
               >
-                {accounts.map((account) => (
-                  <DropdownMenuRadioItem
-                    key={`${account.tenantId ?? "default"}:${account.upn ?? ""}`}
-                    value={account.tenantId ?? "__default__"}
-                    className="gap-3 rounded-lg py-2.5 pr-2.5 pl-8 focus:bg-accent focus:text-foreground"
-                  >
-                    <Avatar size="sm">
-                      <AvatarImage
-                        src={
-                          account.tenantId
-                            ? accountAvatarByTenant[account.tenantId]
-                            : _selfAvatarSrc
-                        }
-                        alt={account.upn}
-                      />
-                      <AvatarFallback className="bg-accent text-[10px] text-muted-foreground">
-                        {(account.upn?.[0] ?? "?").toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="flex min-w-0 flex-1 flex-col">
-                      <span className="truncate text-[13px] font-semibold">
-                        {workspaceLabelFromUpn(account.upn)}
+                {accounts.map((account) => {
+                  const accountLabel = workspaceLabelFromUpn(account.upn);
+                  const accountFallback =
+                    avatarFallbackPresentation(accountLabel);
+                  const isActiveAccount =
+                    account.tenantId === activeTenantId ||
+                    (!account.tenantId && !activeTenantId);
+                  const fallback = isActiveAccount
+                    ? activeWorkspaceFallback
+                    : accountFallback;
+                  return (
+                    <DropdownMenuRadioItem
+                      key={`${account.tenantId ?? "default"}:${account.upn ?? ""}`}
+                      value={account.tenantId ?? "__default__"}
+                      className="gap-3 rounded-lg py-2.5 pr-2.5 pl-8 focus:bg-accent focus:text-foreground"
+                    >
+                      <Avatar size="sm">
+                        <AvatarImage
+                          src={
+                            account.tenantId
+                              ? accountAvatarByTenant[account.tenantId]
+                              : _selfAvatarSrc
+                          }
+                          alt={
+                            isActiveAccount
+                              ? (selfDisplayName ?? account.upn)
+                              : account.upn
+                          }
+                        />
+                        {avatarFallbackReady ? (
+                          <AvatarFallback
+                            className="text-[10px] font-semibold"
+                            style={fallback.style}
+                          >
+                            {fallback.initials}
+                          </AvatarFallback>
+                        ) : null}
+                      </Avatar>
+                      <span className="flex min-w-0 flex-1 flex-col">
+                        <span className="truncate text-[13px] font-semibold">
+                          {accountLabel}
+                        </span>
+                        <span className="truncate text-[11px] text-muted-foreground">
+                          {account.upn ?? "Unknown account"}
+                        </span>
                       </span>
-                      <span className="truncate text-[11px] text-muted-foreground">
-                        {account.upn ?? "Unknown account"}
-                      </span>
-                    </span>
-                    {account.tenantId === activeTenantId ? (
-                      <Check className="size-4 text-primary" />
-                    ) : null}
-                  </DropdownMenuRadioItem>
-                ))}
+                      {account.tenantId === activeTenantId ? (
+                        <Check className="size-4 text-primary" />
+                      ) : null}
+                    </DropdownMenuRadioItem>
+                  );
+                })}
               </DropdownMenuRadioGroup>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -662,6 +709,7 @@ export function Sidebar({
                     presence={
                       item.avatarMri ? presenceByMri[item.avatarMri] : undefined
                     }
+                    avatarFallbackReady={avatarFallbackReady}
                     onSelect={openConversation}
                     onHoverStart={onHoverConversationStart}
                     onHoverEnd={onHoverConversationEnd}

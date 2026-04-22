@@ -236,7 +236,216 @@ describe("ChatWorkspace", () => {
       name: /message thread/i,
     });
     expect(thread).toBeInTheDocument();
-    expect(await screen.findAllByText(/^Group$/i)).not.toHaveLength(0);
+    expect(screen.queryByText(/^Group$/i)).not.toBeInTheDocument();
+  });
+
+  it("uses live thread members for the group header count when the summary count is zero", async () => {
+    const msg = baseMessage({
+      id: "m-live-members",
+      from: "8:other",
+      content: "Hello team",
+    });
+    const mockClient = makeMockClient({
+      getAllConversations: vi.fn().mockResolvedValue({
+        conversations: [
+          {
+            id: "19:live-members@thread.v2",
+            threadProperties: {
+              topic: "Live Members",
+              threadType: "chat",
+              productThreadType: "Chat",
+              membercount: "0",
+            },
+            members: [],
+            lastMessage: msg,
+          },
+        ],
+      }),
+      getMessages: vi.fn().mockResolvedValue({ messages: [msg] }),
+      getThreadMembers: vi.fn().mockResolvedValue([
+        { id: "8:self", role: "Admin", isMri: true, displayName: "Me" },
+        {
+          id: "8:orgid:peer-a",
+          role: "Admin",
+          isMri: true,
+          displayName: "Pat Lee",
+          userPrincipalName: "pat@test.com",
+        },
+        {
+          id: "8:orgid:peer-b",
+          role: "Admin",
+          isMri: true,
+          displayName: "Jordan Ray",
+        },
+        { id: "28:agent-service", role: "Admin", isMri: true },
+      ]),
+      fetchProfileAvatarDataUrls: vi.fn().mockResolvedValue({
+        avatarThumbs: {
+          "8:orgid:peer-a": "data:image/png;base64,peer-a-thumb",
+          "8:orgid:peer-b": "data:image/png;base64,peer-b-thumb",
+        },
+        avatarFull: {
+          "8:orgid:peer-a": "data:image/png;base64,peer-a-full",
+          "8:orgid:peer-b": "data:image/png;base64,peer-b-full",
+        },
+        displayNames: {
+          "8:orgid:peer-a": "Pat Lee",
+          "8:orgid:peer-b": "Jordan Ray",
+        },
+        emails: { "8:orgid:peer-a": "pat@test.com" },
+        jobTitles: {},
+        departments: {},
+        companyNames: {},
+        tenantNames: {},
+        locations: {},
+      }),
+    });
+    vi.mocked(getOrCreateClient).mockResolvedValue(mockClient as never);
+
+    renderChat();
+
+    fireEvent.click(await screen.findByText("Live Members"));
+    await screen.findByRole("region", { name: /message thread/i });
+
+    await waitFor(() => {
+      expect(mockClient.getThreadMembers).toHaveBeenCalledWith(
+        "19:live-members@thread.v2",
+      );
+    });
+    expect(await screen.findByText("3")).toBeInTheDocument();
+    expect(screen.queryByText(/^0$/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^4$/)).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(mockClient.fetchProfileAvatarDataUrls).toHaveBeenCalledWith(
+        expect.arrayContaining(["8:orgid:peer-a", "8:orgid:peer-b"]),
+      );
+    });
+
+    const membersButton = await screen.findByRole("button", {
+      name: /open members \(3\)/i,
+    });
+    await waitFor(() => {
+      expect(membersButton.querySelectorAll("img")).toHaveLength(2);
+    });
+    fireEvent.click(membersButton);
+
+    expect(
+      await screen.findByRole("heading", { name: "Members" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Pat Lee")).toBeInTheDocument();
+    expect(screen.getByText("Jordan Ray")).toBeInTheDocument();
+    expect(screen.queryByText("Unknown member")).not.toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "View profile for Pat Lee" }),
+    );
+
+    expect(await screen.findByText("Pat Lee's profile")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Members" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("reuses cached person profile data when switching chats with the same member", async () => {
+    const firstMessage = baseMessage({
+      id: "m-first",
+      conversationId: "c-first",
+      from: "8:orgid:cache-peer",
+      content: "First group message",
+    });
+    const secondMessage = baseMessage({
+      id: "m-second",
+      conversationId: "c-second",
+      from: "8:orgid:cache-peer",
+      content: "Second group message",
+    });
+    const fetchProfiles = vi.fn().mockImplementation(async (mris: string[]) => {
+      const records = Object.fromEntries(
+        mris.map((mri) => [
+          mri.toLowerCase(),
+          `data:image/png;base64,${mri.replace(/[^a-z0-9]/gi, "")}`,
+        ]),
+      );
+      return {
+        avatarThumbs: records,
+        avatarFull: records,
+        displayNames: {
+          "8:self": "Dirk Stoffberg",
+          "8:orgid:cache-peer": "Pat Lee",
+          "8:orgid:cache-other-a": "Other A",
+          "8:orgid:cache-other-b": "Other B",
+        },
+        emails: {},
+        jobTitles: {},
+        departments: {},
+        companyNames: {},
+        tenantNames: {},
+        locations: {},
+      };
+    });
+    const mockClient = makeMockClient({
+      getAllConversations: vi.fn().mockResolvedValue({
+        conversations: [
+          {
+            id: "c-first",
+            members: [
+              { id: "8:self", role: "Admin", isMri: true },
+              { id: "8:orgid:cache-peer", role: "Admin", isMri: true },
+              { id: "8:orgid:cache-other-a", role: "Admin", isMri: true },
+            ],
+            threadProperties: {
+              topic: "First group",
+              threadType: "chat",
+              productThreadType: "Chat",
+              membercount: "3",
+            },
+            lastMessage: firstMessage,
+          },
+          {
+            id: "c-second",
+            members: [
+              { id: "8:self", role: "Admin", isMri: true },
+              { id: "8:orgid:cache-peer", role: "Admin", isMri: true },
+              { id: "8:orgid:cache-other-b", role: "Admin", isMri: true },
+            ],
+            threadProperties: {
+              topic: "Second group",
+              threadType: "chat",
+              productThreadType: "Chat",
+              membercount: "3",
+            },
+            lastMessage: secondMessage,
+          },
+        ],
+      }),
+      getMessages: vi
+        .fn()
+        .mockImplementation(async (conversationId: string) => ({
+          messages:
+            conversationId === "c-second" ? [secondMessage] : [firstMessage],
+        })),
+      fetchProfileAvatarDataUrls: fetchProfiles,
+    });
+    vi.mocked(getOrCreateClient).mockResolvedValue(mockClient as never);
+
+    renderChat();
+
+    await screen.findByText("First group");
+    await waitFor(() => {
+      expect(fetchProfiles).toHaveBeenCalledTimes(1);
+    });
+
+    fireEvent.click(screen.getByText("First group"));
+    expect(await screen.findByText("First group message")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(fetchProfiles).toHaveBeenCalledTimes(1);
+    });
+
+    fireEvent.click(screen.getByText("Second group"));
+    expect(await screen.findByText("Second group message")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(fetchProfiles).toHaveBeenCalledTimes(1);
+    });
   });
 
   it("records selection perf metrics when perf mode is enabled", async () => {
@@ -1315,6 +1524,54 @@ describe("ChatWorkspace", () => {
     expect(await screen.findByText("From me")).toBeInTheDocument();
   });
 
+  it("uses the Teams self profile name for self messages and account avatars", async () => {
+    const selfMsg = baseMessage({
+      id: "m2",
+      from: "8:self",
+      content: "From me",
+      imdisplayname: "Me",
+    });
+    const mockClient = makeMockClient({
+      account: {
+        upn: "Dirk.Stoffberg@infinitepay.tech",
+        tenantId: "t1",
+        skypeId: "self",
+        expiresAt: new Date(),
+        region: "amer",
+      },
+      getAllConversations: vi.fn().mockResolvedValue({
+        conversations: [
+          {
+            id: "c1",
+            threadProperties: { topic: "Self chat" },
+            lastMessage: selfMsg,
+          },
+        ],
+      }),
+      getMessages: vi.fn().mockResolvedValue({ messages: [selfMsg] }),
+      fetchProfileAvatarDataUrls: vi.fn().mockResolvedValue({
+        avatarThumbs: {},
+        avatarFull: {},
+        displayNames: { "8:self": "Dirk Stoffberg" },
+        emails: {},
+        jobTitles: {},
+        departments: {},
+        companyNames: {},
+        tenantNames: {},
+        locations: {},
+      }),
+    });
+    vi.mocked(getOrCreateClient).mockResolvedValue(mockClient as never);
+
+    renderChat();
+
+    expect(await screen.findByText("DS")).toBeInTheDocument();
+    fireEvent.click(await screen.findByText("Self chat"));
+    expect(await screen.findByText("Dirk Stoffberg")).toBeInTheDocument();
+    expect(screen.queryByText(/^You$/)).not.toBeInTheDocument();
+    expect(screen.queryByText("IN")).not.toBeInTheDocument();
+  });
+
   it("renders message links and mentions", async () => {
     const richMsg = baseMessage({
       id: "m-rich",
@@ -1544,7 +1801,103 @@ describe("ChatWorkspace", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "Open profile for Pat Lee" }),
     );
-    expect(await screen.findByText("Pat Lee's profile")).toBeInTheDocument();
+    const heading = await screen.findByText("Pat Lee's profile");
+    const panel = heading.closest("aside");
+    expect(panel).toBeTruthy();
+    expect(
+      within(panel as HTMLElement).queryByRole("button", { name: "Message" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("opens a profile message button to the person's direct chat from a group", async () => {
+    const dmMessage = baseMessage({
+      id: "m-dm-target",
+      from: "8:orgid:peer-123",
+      content: "Hey from Pat",
+    });
+    const groupMessage = baseMessage({
+      id: "m-group-target",
+      conversationId: "c2",
+      from: "8:orgid:peer-123",
+      content: "Group update",
+    });
+    const mockClient = makeMockClient({
+      getAllConversations: vi.fn().mockResolvedValue({
+        conversations: [
+          {
+            id: "c1",
+            members: [
+              { id: "8:self", role: "Admin", isMri: true },
+              { id: "8:orgid:peer-123", role: "Admin", isMri: true },
+            ],
+            threadProperties: {
+              topic: "Pat Lee",
+              threadType: "chat",
+              productThreadType: "Chat",
+              membercount: "2",
+            },
+            lastMessage: dmMessage,
+          },
+          {
+            id: "c2",
+            members: [
+              { id: "8:self", role: "Admin", isMri: true },
+              { id: "8:orgid:peer-123", role: "Admin", isMri: true },
+              { id: "8:orgid:other-1", role: "Admin", isMri: true },
+            ],
+            threadProperties: {
+              topic: "Design review",
+              threadType: "chat",
+              productThreadType: "Chat",
+              membercount: "3",
+            },
+            lastMessage: groupMessage,
+          },
+        ],
+      }),
+      getMessages: vi
+        .fn()
+        .mockImplementation(async (conversationId: string) => ({
+          messages: conversationId === "c2" ? [groupMessage] : [dmMessage],
+        })),
+      getThreadMembers: vi.fn().mockResolvedValue([
+        { id: "8:self", role: "Admin", isMri: true, displayName: "Me" },
+        { id: "8:orgid:peer-123", role: "Admin", isMri: true },
+        { id: "8:orgid:other-1", role: "Admin", isMri: true },
+      ]),
+      fetchProfileAvatarDataUrls: vi.fn().mockResolvedValue({
+        avatars: {},
+        displayNames: { "8:orgid:peer-123": "Pat Lee" },
+        emails: { "8:orgid:peer-123": "pat@test.com" },
+        jobTitles: { "8:orgid:peer-123": "Engineer" },
+      }),
+    });
+    vi.mocked(getOrCreateClient).mockResolvedValue(mockClient as never);
+
+    renderChat();
+    fireEvent.click(await screen.findByText("Design review"));
+    const profileTriggers = await screen.findAllByLabelText(
+      "View profile: Pat Lee",
+    );
+    fireEvent.click(profileTriggers[0] as HTMLElement);
+
+    const heading = await screen.findByText("Pat Lee's profile");
+    const panel = heading.closest("aside");
+    expect(panel).toBeTruthy();
+    fireEvent.click(
+      within(panel as HTMLElement).getByRole("button", { name: "Message" }),
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByText("Pat Lee's profile")).not.toBeInTheDocument();
+    });
+    const composer = await screen.findByRole("textbox", {
+      name: /message text/i,
+    });
+    await waitFor(() => {
+      expect(composer).toHaveAttribute("data-placeholder", "Message Pat Lee…");
+    });
+    expect(document.activeElement).toBe(composer);
   });
 
   it("shows other chats with the same person in the profile sidebar", async () => {
@@ -1659,10 +2012,10 @@ describe("ChatWorkspace", () => {
       within(panel as HTMLElement).getByText("OTHER CHATS"),
     ).toBeInTheDocument();
     expect(
-      within(panel as HTMLElement).getByText("Design review"),
+      await within(panel as HTMLElement).findByText("Design review"),
     ).toBeInTheDocument();
     expect(
-      within(panel as HTMLElement).getByText("Project alpha"),
+      await within(panel as HTMLElement).findByText("Project alpha"),
     ).toBeInTheDocument();
     expect(
       within(panel as HTMLElement).queryByText("Random chat"),

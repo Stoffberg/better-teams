@@ -97,8 +97,10 @@ type ThreadViewProps = {
   consumptionHorizon?: string;
   onSearchResultCountChange?: (resultCount: number) => void;
   selfSkypeId?: string;
+  selfDisplayName?: string;
   avatarByMri: Record<string, string>;
   avatarFullByMri: Record<string, string>;
+  avatarFallbackReady: boolean;
   displayNameByMri: Record<string, string>;
   emailByMri: Record<string, string>;
   jobTitleByMri: Record<string, string>;
@@ -135,8 +137,10 @@ export const ThreadView = forwardRef<ThreadViewHandle, ThreadViewProps>(
       consumptionHorizon,
       onSearchResultCountChange,
       selfSkypeId,
+      selfDisplayName,
       avatarByMri,
       avatarFullByMri,
+      avatarFallbackReady,
       displayNameByMri,
       emailByMri,
       jobTitleByMri,
@@ -235,6 +239,8 @@ export const ThreadView = forwardRef<ThreadViewHandle, ThreadViewProps>(
       () => ({ ...avatarFullByMri, ...threadProfilePresentation.avatarFull }),
       [avatarFullByMri, threadProfilePresentation.avatarFull],
     );
+    const mergedAvatarFallbackReady =
+      avatarFallbackReady && threadProfilePresentation.avatarFallbackReady;
     const mergedDisplayNameByMri = useMemo(
       () => ({
         ...displayNameByMri,
@@ -285,6 +291,10 @@ export const ThreadView = forwardRef<ThreadViewHandle, ThreadViewProps>(
       () => selfMriFromSkypeId(selfSkypeId),
       [selfSkypeId],
     );
+    const selfMessageDisplayName =
+      (selfMri ? mergedDisplayNameByMri[selfMri]?.trim() : "") ||
+      selfDisplayName?.trim() ||
+      "You";
     const fallbackPeerHorizons = useMemo(() => {
       const h = parseConsumptionHorizon(consumptionHorizon);
       return h ? [h] : [];
@@ -389,7 +399,7 @@ export const ThreadView = forwardRef<ThreadViewHandle, ThreadViewProps>(
             message,
             parts,
             displayName: self
-              ? "You"
+              ? selfMessageDisplayName
               : message.senderDisplayName?.trim() ||
                 message.imdisplayname?.trim() ||
                 "Unknown",
@@ -418,7 +428,7 @@ export const ThreadView = forwardRef<ThreadViewHandle, ThreadViewProps>(
               .trim(),
             searchText: [
               self
-                ? "You"
+                ? selfMessageDisplayName
                 : message.senderDisplayName?.trim() ||
                   message.imdisplayname?.trim() ||
                   "Unknown",
@@ -468,6 +478,7 @@ export const ThreadView = forwardRef<ThreadViewHandle, ThreadViewProps>(
       receiptParticipantByMri,
       receiptParticipants,
       selfSkypeId,
+      selfMessageDisplayName,
       selfMri,
       peerHorizons,
     ]);
@@ -492,6 +503,7 @@ export const ThreadView = forwardRef<ThreadViewHandle, ThreadViewProps>(
             part.text.replace(/^@/, ""),
           avatarThumbSrc: mergedAvatarByMri[mri],
           avatarFullSrc: mergedAvatarFullByMri[mri] ?? mergedAvatarByMri[mri],
+          avatarFallbackReady: mergedAvatarFallbackReady,
           email: mergedEmailByMri[mri],
           jobTitle: mergedJobTitleByMri[mri],
           department: mergedDepartmentByMri[mri],
@@ -528,6 +540,7 @@ export const ThreadView = forwardRef<ThreadViewHandle, ThreadViewProps>(
         queryClient,
         sharedConversationsByMri,
         threadPresenceByMri,
+        mergedAvatarFallbackReady,
         mergedAvatarByMri,
         mergedAvatarFullByMri,
         mergedCompanyNameByMri,
@@ -802,6 +815,7 @@ export const ThreadView = forwardRef<ThreadViewHandle, ThreadViewProps>(
                           avatarFullSrc:
                             mergedAvatarFullByMri[mri] ??
                             mergedAvatarByMri[mri],
+                          avatarFallbackReady: mergedAvatarFallbackReady,
                           email: mergedEmailByMri[mri],
                           jobTitle: mergedJobTitleByMri[mri],
                           department: mergedDepartmentByMri[mri],
@@ -839,6 +853,7 @@ export const ThreadView = forwardRef<ThreadViewHandle, ThreadViewProps>(
                         entry={block.entry}
                         showMeta={block.showMeta}
                         avatarSrc={mergedAvatarByMri[mri]}
+                        avatarFallbackReady={mergedAvatarFallbackReady}
                         presence={threadPresenceByMri[mri]}
                         profile={profile}
                         isHighlighted={

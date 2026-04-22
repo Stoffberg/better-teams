@@ -2,7 +2,7 @@ import { PerfProfiler } from "@better-teams/app/platform/perf";
 import { useTeamsAccountContext } from "@better-teams/app/providers/TeamsAccountProvider";
 import { Skeleton } from "@better-teams/ui/components/skeleton";
 import { Composer } from "../composer/Composer";
-import { ProfileSidebar } from "../profile/ProfileCard";
+import { MembersSidebar, ProfileSidebar } from "../profile/ProfileCard";
 import { Sidebar } from "../sidebar/Sidebar";
 import { ThreadHeader } from "../thread/ThreadHeader";
 import { ThreadView } from "../thread/ThreadView";
@@ -100,6 +100,7 @@ function ProductivityWorkspaceContent() {
         >
           <Sidebar
             upn={workspace.session?.upn}
+            selfDisplayName={workspace.selfDisplayName}
             selfAvatarSrc={workspace.selfAvatarSrc}
             accountAvatarByTenant={workspace.accountAvatarByTenant}
             presenceByMri={workspace.presenceByMri}
@@ -120,6 +121,7 @@ function ProductivityWorkspaceContent() {
             searchInputRef={workspace.searchInputRef}
             accountLoading={workspace.accountLoading}
             conversationsLoading={workspace.conversationsLoading}
+            avatarFallbackReady={workspace.avatarFallbackReady}
           />
         </PerfProfiler>
 
@@ -142,20 +144,15 @@ function ProductivityWorkspaceContent() {
               <ThreadHeader
                 title={workspace.selectedItem.title}
                 kind={workspace.selectedItem.kind}
-                memberCount={
-                  workspace.selectedItem.conversation.memberCount ??
-                  workspace.selectedItem.conversation.members?.length ??
-                  (workspace.selectedItem.kind === "dm" ? 2 : null)
-                }
-                avatarMris={
-                  workspace.selectedItem.conversation.members
-                    ?.map((member) => member.id)
-                    .filter(Boolean) ?? []
-                }
-                avatarByMri={workspace.avatarThumbByMri}
-                presenceByMri={workspace.presenceByMri}
+                memberCount={workspace.selectedHeaderMemberCount}
+                avatarMris={workspace.selectedHeaderAvatarMris}
+                avatarByMri={workspace.selectedAvatarThumbByMri}
+                avatarLabelByMri={workspace.selectedHeaderAvatarLabelsByMri}
+                avatarFallbackReady={workspace.selectedAvatarFallbackReady}
+                presenceByMri={workspace.selectedPresenceByMri}
                 onOpenProfile={workspace.handleOpenSelectedProfile}
                 profileButtonLabel={workspace.selectedProfileButtonLabel}
+                onOpenMembers={workspace.handleOpenMembersSidebar}
                 searchQuery={workspace.threadSearchQuery}
                 searchResultCount={workspace.threadSearchResultCount}
                 onSearchQueryChange={workspace.setThreadSearchQuery}
@@ -185,8 +182,10 @@ function ProductivityWorkspaceContent() {
                     workspace.setThreadSearchResultCount
                   }
                   selfSkypeId={workspace.session?.skypeId}
+                  selfDisplayName={workspace.selfDisplayName}
                   avatarByMri={workspace.avatarThumbByMri}
                   avatarFullByMri={workspace.avatarFullByMri}
+                  avatarFallbackReady={workspace.avatarFallbackReady}
                   displayNameByMri={workspace.displayNameByMri}
                   emailByMri={workspace.emailByMri}
                   jobTitleByMri={workspace.jobTitleByMri}
@@ -212,7 +211,7 @@ function ProductivityWorkspaceContent() {
                   conversationId={workspace.activeConversationId as string}
                   conversationTitle={workspace.selectedItem.title}
                   conversationMembers={
-                    workspace.selectedItem.conversation.members
+                    workspace.selectedConversationMembers
                       ?.map((member) => member.id ?? "")
                       .filter(Boolean) ?? []
                   }
@@ -230,6 +229,14 @@ function ProductivityWorkspaceContent() {
             profile={workspace.profileSidebarData}
             closeLabel="Close profile sidebar"
             onClose={workspace.handleCloseProfileSidebar}
+          />
+        ) : workspace.membersSidebarOpen ? (
+          <MembersSidebar
+            members={workspace.selectedMemberProfiles}
+            memberCount={workspace.selectedHeaderMemberCount}
+            onOpenProfile={workspace.handleOpenMemberProfile}
+            closeLabel="Close members sidebar"
+            onClose={workspace.handleCloseMembersSidebar}
           />
         ) : null}
       </div>

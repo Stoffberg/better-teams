@@ -1,25 +1,14 @@
-import { initialsFromLabel } from "@better-teams/core/chat";
 import { presenceDescription } from "@better-teams/core/teams/presence";
 import type { PresenceInfo } from "@better-teams/core/teams/types";
 import { cn } from "@better-teams/ui/utils";
+import { Hash, MessageSquare, Video, X } from "lucide-react";
 import {
-  Briefcase,
-  Building2,
-  Hash,
-  Mail,
-  MapPin,
-  MessageSquare,
-  Shapes,
-  Video,
-  X,
-} from "lucide-react";
-import {
-  type ComponentType,
   type KeyboardEventHandler,
   type MouseEventHandler,
   type ReactNode,
   useState,
 } from "react";
+import { avatarFallbackPresentation } from "../avatar/avatar-fallback";
 import { PresenceBadge } from "../presence/PresenceBadge";
 
 export type ProfileData = {
@@ -27,6 +16,7 @@ export type ProfileData = {
   displayName: string;
   avatarThumbSrc?: string;
   avatarFullSrc?: string;
+  avatarFallbackReady?: boolean;
   email?: string;
   jobTitle?: string;
   department?: string;
@@ -36,6 +26,7 @@ export type ProfileData = {
   presence?: PresenceInfo | null;
   currentConversationId?: string;
   sharedConversationHeading?: string;
+  sharedConversationsLoading?: boolean;
   onOpenConversation?: (conversationId: string) => void;
   onMessage?: () => void;
   sharedConversations?: Array<{
@@ -56,13 +47,16 @@ function ProfileAvatar({
   name,
   size,
   presence,
+  fallbackReady = true,
 }: {
   src?: string;
   name: string;
   size: "sm" | "lg" | "xl";
   presence?: PresenceInfo | null;
+  fallbackReady?: boolean;
 }) {
   const [failed, setFailed] = useState(false);
+  const fallback = avatarFallbackPresentation(name);
   const cls = size === "xl" ? "size-28" : size === "lg" ? "size-24" : "size-10";
   const textCls =
     size === "xl"
@@ -86,17 +80,25 @@ function ProfileAvatar({
       </span>
     );
   }
+  if (!fallbackReady && !failed) {
+    return (
+      <span className="relative block" aria-hidden>
+        <span className={cn("block shrink-0", cls, radius)} />
+      </span>
+    );
+  }
   return (
     <span className="relative block">
       <span
         className={cn(
-          "flex shrink-0 items-center justify-center bg-primary/10 text-primary shadow-md",
+          "flex shrink-0 items-center justify-center shadow-md",
           cls,
           radius,
           textCls,
         )}
+        style={fallback.style}
       >
-        {initialsFromLabel(name)}
+        {fallback.initials}
       </span>
       <PresenceBadge presence={presence} size="lg" />
     </span>
@@ -112,6 +114,7 @@ function HoverProfileCard({ profile }: { profile: ProfileData }) {
         name={profile.displayName}
         size="sm"
         presence={profile.presence}
+        fallbackReady={profile.avatarFallbackReady}
       />
       <div className="min-w-0">
         <p className="truncate text-[13px] font-semibold leading-tight text-foreground">
@@ -137,71 +140,6 @@ function HoverProfileCard({ profile }: { profile: ProfileData }) {
   );
 }
 
-function ProfileInfoRow({
-  icon: Icon,
-  label,
-  isLink,
-  href,
-}: {
-  icon: ComponentType<{ className?: string }>;
-  label: string;
-  isLink?: boolean;
-  href?: string;
-}) {
-  const content = (
-    <div className="flex items-center gap-3 py-2">
-      <Icon className="size-4 shrink-0 text-muted-foreground/60" />
-      {isLink && href ? (
-        <a
-          href={href}
-          className="min-w-0 cursor-pointer truncate text-[14px] text-primary hover:underline"
-          onClick={(e) => {
-            e.preventDefault();
-            import("@better-teams/app/services/desktop/open-external").then(
-              ({ openExternal }) => openExternal(href),
-            );
-          }}
-        >
-          {label}
-        </a>
-      ) : (
-        <span className="min-w-0 truncate text-[14px] text-foreground">
-          {label}
-        </span>
-      )}
-    </div>
-  );
-  return content;
-}
-
-function ProfileFact({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: ComponentType<{ className?: string }>;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="rounded-xl border border-border/80 bg-accent/35 px-3 py-3">
-      <div className="flex items-start gap-3">
-        <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-background">
-          <Icon className="size-4 text-muted-foreground/70" />
-        </div>
-        <div className="min-w-0">
-          <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-            {label}
-          </p>
-          <p className="pt-0.5 text-[13px] font-medium leading-snug text-foreground">
-            {value}
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function SharedConversationIcon({
   kind,
 }: {
@@ -218,49 +156,45 @@ function SharedConversationList({ profile }: { profile: ProfileData }) {
   const items = (profile.sharedConversations ?? []).filter(
     (item) => item.id !== profile.currentConversationId,
   );
-  if (items.length === 0) return null;
+  if (!profile.sharedConversationsLoading && items.length === 0) return null;
 
   return (
-    <div className="px-6 pt-5">
+    <div className="px-6 pt-4" aria-busy={profile.sharedConversationsLoading}>
       <div className="mb-1">
         <h5 className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
           OTHER CHATS
         </h5>
       </div>
       <div className="max-h-56 space-y-0.5 overflow-y-auto pr-1">
-        {items.slice(0, 6).map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            onClick={() => profile.onOpenConversation?.(item.id)}
-            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-accent/50"
-          >
-            <SharedConversationIcon kind={item.kind} />
-            <p className="min-w-0 truncate text-[13px] font-medium text-foreground">
-              {item.title}
-            </p>
-          </button>
-        ))}
+        {profile.sharedConversationsLoading
+          ? Array.from({ length: 4 }, (_, index) => (
+              <div
+                key={`shared-loading-${index}`}
+                className="flex items-center gap-2 rounded-md px-2 py-1.5"
+              >
+                <span className="size-3.5 shrink-0 animate-pulse rounded bg-muted" />
+                <span
+                  className="h-3.5 animate-pulse rounded bg-muted"
+                  style={{ width: `${70 - index * 10}%` }}
+                />
+              </div>
+            ))
+          : items.slice(0, 6).map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => profile.onOpenConversation?.(item.id)}
+                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-accent/50"
+              >
+                <SharedConversationIcon kind={item.kind} />
+                <p className="min-w-0 truncate text-[13px] font-medium text-foreground">
+                  {item.title}
+                </p>
+              </button>
+            ))}
       </div>
     </div>
   );
-}
-
-function profileFacts(profile: ProfileData) {
-  const orgName = profileOrgName(profile);
-  return [
-    orgName ? { icon: Building2, label: "Organization", value: orgName } : null,
-    profile.department
-      ? { icon: Shapes, label: "Department", value: profile.department }
-      : null,
-    profile.location
-      ? { icon: MapPin, label: "Location", value: profile.location }
-      : null,
-  ].filter(Boolean) as Array<{
-    icon: ComponentType<{ className?: string }>;
-    label: string;
-    value: string;
-  }>;
 }
 
 export function ProfileSidebar({
@@ -280,9 +214,6 @@ export function ProfileSidebar({
   onClick?: MouseEventHandler<HTMLElement>;
   onKeyDown?: KeyboardEventHandler<HTMLElement>;
 }) {
-  const orgName = profileOrgName(profile);
-  const facts = profileFacts(profile);
-
   return (
     <aside
       role={role}
@@ -308,68 +239,44 @@ export function ProfileSidebar({
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        <div className="flex flex-col items-center gap-3 px-6 pt-8 pb-6">
-          <div className="rounded-full ring-4 ring-background">
+        <div className="flex flex-col items-center gap-3 px-6 pt-8 pb-6 text-center">
+          <div className="shrink-0 rounded-full ring-4 ring-background">
             <ProfileAvatar
               src={profile.avatarFullSrc ?? profile.avatarThumbSrc}
               name={profile.displayName}
               size="xl"
               presence={profile.presence}
+              fallbackReady={profile.avatarFallbackReady}
             />
           </div>
-          <div className="space-y-0.5 text-center">
-            <h4 className="text-[20px] font-bold leading-snug tracking-[-0.01em]">
-              {profile.displayName}
-            </h4>
+          <div className="min-w-0 max-w-full space-y-1 text-center">
+            {profile.email ? (
+              <a
+                href={`mailto:${profile.email}`}
+                className="block text-[13px] font-medium break-all text-primary hover:underline"
+                onClick={(e) => {
+                  e.preventDefault();
+                  import(
+                    "@better-teams/app/services/desktop/open-external"
+                  ).then(({ openExternal }) =>
+                    openExternal(`mailto:${profile.email}`),
+                  );
+                }}
+              >
+                {profile.email}
+              </a>
+            ) : null}
             {profile.jobTitle ? (
-              <p className="text-[14px] text-muted-foreground">
+              <div className="text-[13px] leading-snug text-muted-foreground">
                 {profile.jobTitle}
-              </p>
-            ) : null}
-            {profile.presence ? (
-              <p className="text-[13px] text-muted-foreground">
-                {presenceDescription(profile.presence)}
-              </p>
-            ) : null}
-            {orgName ? (
-              <p className="text-[13px] font-medium text-muted-foreground/90">
-                {orgName}
-              </p>
+              </div>
             ) : null}
           </div>
         </div>
 
         <div className="mx-6 border-t border-border" />
 
-        {facts.length > 0 ? (
-          <div className="grid gap-2 px-6 pt-5">
-            {facts.map((fact) => (
-              <ProfileFact
-                key={fact.label}
-                icon={fact.icon}
-                label={fact.label}
-                value={fact.value}
-              />
-            ))}
-          </div>
-        ) : null}
-
         <SharedConversationList profile={profile} />
-
-        <div className="space-y-0 px-6 pt-5 pb-6">
-          {profile.email ? (
-            <ProfileInfoRow
-              icon={Mail}
-              label={profile.email}
-              isLink
-              href={`mailto:${profile.email}`}
-            />
-          ) : null}
-
-          {profile.jobTitle ? (
-            <ProfileInfoRow icon={Briefcase} label={profile.jobTitle} />
-          ) : null}
-        </div>
       </div>
 
       {profile.onMessage ? (
@@ -384,6 +291,90 @@ export function ProfileSidebar({
           </button>
         </div>
       ) : null}
+    </aside>
+  );
+}
+
+export function MembersSidebar({
+  title = "Members",
+  members,
+  memberCount,
+  onOpenProfile,
+  onClose,
+  closeLabel = "Close members",
+  className,
+}: {
+  title?: string;
+  members: ProfileData[];
+  memberCount: number | null;
+  onOpenProfile?: (profile: ProfileData) => void;
+  onClose: () => void;
+  closeLabel?: string;
+  className?: string;
+}) {
+  return (
+    <aside
+      className={cn(
+        "flex w-80 shrink-0 flex-col overflow-hidden border-l border-border bg-background",
+        className,
+      )}
+    >
+      <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+        <div className="min-w-0 flex-1">
+          <h3 className="truncate text-[15px] font-bold">{title}</h3>
+          {memberCount != null ? (
+            <p className="text-[12px] tabular-nums text-muted-foreground">
+              {memberCount} members
+            </p>
+          ) : null}
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="flex size-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
+          aria-label={closeLabel}
+        >
+          <X className="size-4" />
+        </button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-3 py-3">
+        {members.length > 0 ? (
+          <div className="space-y-1">
+            {members.map((member) => (
+              <button
+                key={member.mri}
+                type="button"
+                onClick={() => onOpenProfile?.(member)}
+                className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-accent/55"
+                aria-label={`View profile for ${member.displayName}`}
+              >
+                <ProfileAvatar
+                  src={member.avatarThumbSrc}
+                  name={member.displayName}
+                  size="sm"
+                  presence={member.presence}
+                  fallbackReady={member.avatarFallbackReady}
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[13px] font-semibold leading-tight text-foreground">
+                    {member.displayName}
+                  </p>
+                  {member.jobTitle || member.email ? (
+                    <p className="truncate pt-0.5 text-[12px] leading-tight text-muted-foreground">
+                      {member.jobTitle ?? member.email}
+                    </p>
+                  ) : null}
+                </div>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <p className="px-3 py-8 text-center text-[13px] text-muted-foreground/60">
+            No members loaded yet.
+          </p>
+        )}
+      </div>
     </aside>
   );
 }

@@ -153,6 +153,30 @@ describe("collectProfileAvatarMris", () => {
     });
     expect(list).toContain("8:orgid:peer-id");
   });
+
+  it("adds group member ids as avatar candidates", () => {
+    const list = collectProfileAvatarMris({
+      conversations: [
+        {
+          id: "19:group@thread.v2",
+          threadProperties: { membercount: "3", threadType: "chat" },
+          members: [
+            { id: "8:orgid:self-id", role: "User", isMri: true },
+            { id: "8:orgid:peer-a", role: "User", isMri: true },
+            { id: "8:orgid:peer-b", role: "User", isMri: true },
+          ],
+        } as Conversation,
+      ],
+      messages: [],
+      selfSkypeId: "8:orgid:self-id",
+    });
+
+    expect(list).toEqual([
+      "8:orgid:self-id",
+      "8:orgid:peer-a",
+      "8:orgid:peer-b",
+    ]);
+  });
 });
 
 describe("normalizeFetchShortProfileRows", () => {

@@ -108,7 +108,7 @@ export function useSharedConversationLookup({
   const detailedSharedConversationById =
     sharedConversationDetailsQuery.data ?? {};
 
-  return useMemo(
+  const sharedConversationsByMri = useMemo(
     () =>
       buildSharedConversationsByMri(
         allSidebarItems,
@@ -124,4 +124,12 @@ export function useSharedConversationLookup({
       emailByMri,
     ],
   );
+
+  return {
+    sharedConversationsByMri,
+    loading:
+      Boolean(profileSidebarMri) &&
+      sharedConversationCandidateIds.length > 0 &&
+      sharedConversationDetailsQuery.isPending,
+  };
 }

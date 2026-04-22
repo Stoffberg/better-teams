@@ -20,7 +20,7 @@ export function PresenceBadge({
   return (
     <span
       className={cn(
-        "absolute right-0 bottom-0 z-10 inline-flex shrink-0 rounded-full border-2 border-background shadow-sm",
+        "absolute right-0 bottom-0 z-10 inline-flex shrink-0 rounded-full border border-background shadow-sm",
         sizeClassName,
         tone,
         className,

@@ -1,7 +1,7 @@
 import type { ConversationChatKind } from "@better-teams/core/chat";
 import { canonAvatarMri } from "@better-teams/core/teams/profile/avatars";
 import type { PresenceInfo } from "@better-teams/core/teams/types";
-import { ChevronDown, Hash, Search, Users, Video, X } from "lucide-react";
+import { Hash, Search, Users, Video, X } from "lucide-react";
 import {
   startTransition,
   useDeferredValue,
@@ -9,13 +9,8 @@ import {
   useRef,
   useState,
 } from "react";
+import { avatarFallbackPresentation } from "../avatar/avatar-fallback";
 import { PresenceBadge } from "../presence/PresenceBadge";
-
-function kindLabel(kind: ConversationChatKind): string {
-  if (kind === "group") return "Group";
-  if (kind === "meeting") return "Meeting";
-  return "Direct";
-}
 
 function KindIcon({ kind }: { kind: ConversationChatKind }) {
   if (kind === "group") {
@@ -27,15 +22,74 @@ function KindIcon({ kind }: { kind: ConversationChatKind }) {
   return null;
 }
 
+function HeaderParticipantAvatar({
+  src,
+  label,
+  presence,
+  fallbackReady,
+}: {
+  src?: string;
+  label: string;
+  presence?: PresenceInfo;
+  fallbackReady: boolean;
+}) {
+  const [failed, setFailed] = useState(false);
+  const fallback = avatarFallbackPresentation(label);
+
+  if (src && !failed) {
+    return (
+      <div className="relative">
+        <img
+          src={src}
+          alt=""
+          onError={() => setFailed(true)}
+          className="size-6 rounded-full border-2 border-background object-cover"
+        />
+        <PresenceBadge
+          presence={presence}
+          size="sm"
+          className="size-2 ring-background"
+        />
+      </div>
+    );
+  }
+  if (!fallbackReady && !failed) {
+    return (
+      <div
+        className="size-6 rounded-full border-2 border-background"
+        aria-hidden
+      />
+    );
+  }
+  return (
+    <div className="relative">
+      <div
+        className="flex size-6 items-center justify-center rounded-full border-2 border-background text-[9px] font-semibold"
+        style={fallback.style}
+      >
+        {fallback.initials}
+      </div>
+      <PresenceBadge
+        presence={presence}
+        size="sm"
+        className="size-2 ring-background"
+      />
+    </div>
+  );
+}
+
 export function ThreadHeader({
   title,
   kind,
   memberCount,
   avatarMris,
   avatarByMri,
+  avatarLabelByMri,
+  avatarFallbackReady = true,
   presenceByMri,
   onOpenProfile,
   profileButtonLabel,
+  onOpenMembers,
   searchQuery,
   searchResultCount,
   onSearchQueryChange,
@@ -47,9 +101,12 @@ export function ThreadHeader({
   memberCount: number | null;
   avatarMris: string[];
   avatarByMri: Record<string, string>;
+  avatarLabelByMri: Record<string, string>;
+  avatarFallbackReady?: boolean;
   presenceByMri: Record<string, PresenceInfo>;
   onOpenProfile?: () => void;
   profileButtonLabel?: string;
+  onOpenMembers?: () => void;
   searchQuery: string;
   searchResultCount: number;
   onSearchQueryChange: (value: string) => void;
@@ -93,17 +150,9 @@ export function ThreadHeader({
         : `${searchResultCount} results`;
 
   const titleBlock = (
-    <>
-      <h2 className="min-w-0 truncate text-[16px] font-bold leading-tight tracking-[-0.01em]">
-        {title}
-      </h2>
-      {onOpenProfile ? (
-        <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
-      ) : null}
-      <span className="rounded-full bg-accent px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
-        {kindLabel(kind)}
-      </span>
-    </>
+    <h2 className="min-w-0 truncate text-[16px] font-bold leading-tight tracking-[-0.01em]">
+      {title}
+    </h2>
   );
 
   return (
@@ -175,44 +224,42 @@ export function ThreadHeader({
           </div>
         ) : null}
         {showParticipantSummary ? (
-          <>
-            <div className="flex -space-x-1.5">
-              {avatarMris.slice(0, 3).map((mri) => {
-                const normalizedMri = canonAvatarMri(mri);
-                const avatarSrc = avatarByMri[normalizedMri];
-                const presence = presenceByMri[normalizedMri];
-                return avatarSrc ? (
-                  <div key={mri} className="relative">
-                    <img
+          <button
+            type="button"
+            onClick={onOpenMembers}
+            className="flex items-center gap-2 rounded-lg px-1.5 py-1 transition-colors hover:bg-accent"
+            aria-label={
+              memberCount != null
+                ? `Open members (${memberCount})`
+                : "Open members"
+            }
+          >
+            {avatarMris.length > 0 ? (
+              <div className="flex -space-x-1.5">
+                {avatarMris.slice(0, 3).map((mri) => {
+                  const normalizedMri = canonAvatarMri(mri);
+                  const avatarSrc = avatarByMri[normalizedMri];
+                  const label = avatarLabelByMri[normalizedMri] ?? "";
+                  const presence = presenceByMri[normalizedMri];
+                  return (
+                    <HeaderParticipantAvatar
+                      key={mri}
                       src={avatarSrc}
-                      alt=""
-                      className="size-6 rounded-full border-2 border-background object-cover"
-                    />
-                    <PresenceBadge
+                      label={label}
                       presence={presence}
-                      size="sm"
-                      className="ring-background"
+                      fallbackReady={avatarFallbackReady}
                     />
-                  </div>
-                ) : (
-                  <div key={`placeholder-${mri}`} className="relative">
-                    <div className="size-6 rounded-full border-2 border-background bg-accent" />
-                    <PresenceBadge
-                      presence={presence}
-                      size="sm"
-                      className="ring-background"
-                    />
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            ) : null}
             {memberCount != null ? (
               <span className="inline-flex items-center gap-1 text-[13px] tabular-nums text-muted-foreground">
                 <Users className="size-3.5" />
                 {memberCount}
               </span>
             ) : null}
-          </>
+          </button>
         ) : null}
         <button
           type="button"

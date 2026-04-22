@@ -63,6 +63,13 @@ const TEAMS_WEB_UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 
 const DEFAULT_ASM_URL = "https://api.asm.skype.com";
+const PROFILE_IMAGE_CACHE_VERSION = "profile-image-v4";
+const GENERATED_PROFILE_IMAGE_HASHES = new Set([
+  "680c480358c1cbf7abad01cc250ae409571e4442",
+  "9dc28272dd6e1beb3f813965f79d5aa0d357ceaa",
+  "36d594c1fa59a2522800184253548e413ce74640",
+  "eb28afd1975747438129cc4fdbdc71e7e0b26e6e",
+]);
 
 type AttachmentKind = "image" | "file";
 
@@ -124,6 +131,35 @@ function sniffImageMimeFromBuffer(buf: ArrayBuffer): string | null {
     return "image/webp";
   }
   return null;
+}
+
+function hexFromArrayBuffer(buf: ArrayBuffer): string {
+  return [...new Uint8Array(buf)]
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+async function isKnownGeneratedProfileImage(
+  buf: ArrayBuffer,
+): Promise<boolean> {
+  const digest = await globalThis.crypto?.subtle
+    ?.digest("SHA-1", buf)
+    .catch(() => null);
+  return digest
+    ? GENERATED_PROFILE_IMAGE_HASHES.has(hexFromArrayBuffer(digest))
+    : false;
+}
+
+function isGeneratedTeamsUserProfilePictureUrl(href: string): boolean {
+  try {
+    const url = new URL(href);
+    return (
+      url.pathname.toLowerCase().endsWith("/profilepicture") &&
+      url.searchParams.get("displayName")?.trim().toLowerCase() === "teamsuser"
+    );
+  } catch {
+    return false;
+  }
 }
 
 function decodeJwtPayload(token: string): Record<string, unknown> | null {
@@ -1075,10 +1111,9 @@ export class TeamsApiClient {
     const baseMt = mt.replace(/\/$/, "");
     const enc = encodeURIComponent(mri);
     const pic = `${baseMt}/v1/users/${enc}/profilePicture`;
-    const q = "displayName=TeamsUser";
     return quality === "thumb"
-      ? [`${pic}?${q}&size=HR64x64`, `${pic}?${q}&size=HR96x96`]
-      : [`${pic}?${q}&size=HR360x360`, `${pic}?${q}&size=HR96x96`];
+      ? [`${pic}?size=HR64x64`, `${pic}?size=HR96x96`]
+      : [`${pic}?size=HR360x360`, `${pic}?size=HR96x96`];
   }
 
   private async fetchFirstProfilePictureDataUrl(
@@ -1134,7 +1169,11 @@ export class TeamsApiClient {
   async fetchAuthenticatedImageSrc(imageUrl: string): Promise<string | null> {
     await this.refreshIfNeeded();
     const resolved = this.resolveProfileImageUrl(imageUrl);
-    const cached = await this.runtime.getCachedImageFile(resolved);
+    if (isGeneratedTeamsUserProfilePictureUrl(resolved)) {
+      return null;
+    }
+    const cacheKey = `${PROFILE_IMAGE_CACHE_VERSION}:${resolved}`;
+    const cached = await this.runtime.getCachedImageFile(cacheKey);
     if (cached && (await this.runtime.hasCachedImageFile(cached))) {
       return this.runtime.filePathToAssetUrl(cached);
     }
@@ -1210,8 +1249,9 @@ export class TeamsApiClient {
         ct = sniffed;
       }
       const bytes = new Uint8Array(buf);
+      if (await isKnownGeneratedProfileImage(buf)) return null;
       const filePath = await this.runtime.cacheImageFile(
-        resolved,
+        cacheKey,
         bytes,
         imageFileExtensionFromMime(ct) ?? undefined,
       );

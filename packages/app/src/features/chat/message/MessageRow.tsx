@@ -1,10 +1,9 @@
 import { useAuthenticatedImage } from "@better-teams/app/features/chat/profile/use-authenticated-image";
 import { openExternal } from "@better-teams/app/services/desktop/open-external";
-import {
-  initialsFromLabel,
-  type MessageAttachment,
-  type MessageInlinePart,
-  type MessageReference,
+import type {
+  MessageAttachment,
+  MessageInlinePart,
+  MessageReference,
 } from "@better-teams/core/chat";
 import type { PresenceInfo } from "@better-teams/core/teams/types";
 import { cn } from "@better-teams/ui/utils";
@@ -15,6 +14,7 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { avatarFallbackPresentation } from "../avatar/avatar-fallback";
 import { PresenceBadge } from "../presence/PresenceBadge";
 import type { ProfileData } from "../profile/ProfileCard";
 import { ProfileTrigger } from "../profile/ProfileCard";
@@ -72,13 +72,15 @@ function MsgAvatar({
   src,
   name,
   presence,
+  fallbackReady = true,
 }: {
   src?: string;
   name: string;
   presence?: PresenceInfo | null;
+  fallbackReady?: boolean;
 }) {
   const [failed, setFailed] = useState(false);
-  const initials = initialsFromLabel(name);
+  const fallback = avatarFallbackPresentation(name);
 
   if (src && !failed) {
     return (
@@ -92,18 +94,24 @@ function MsgAvatar({
         <PresenceBadge
           presence={presence}
           size="lg"
-          className="rounded-md ring-background"
+          className="size-3 rounded-md ring-background"
         />
       </span>
     );
   }
+  if (!fallbackReady && !failed) {
+    return <span className="block size-9 shrink-0 rounded-lg" aria-hidden />;
+  }
   return (
-    <span className="relative flex size-9 items-center justify-center rounded-lg bg-primary/10 text-[11px] font-bold text-primary">
-      {initials}
+    <span
+      className="relative flex size-9 items-center justify-center rounded-lg text-[11px] font-bold"
+      style={fallback.style}
+    >
+      {fallback.initials}
       <PresenceBadge
         presence={presence}
         size="lg"
-        className="rounded-md ring-background"
+        className="size-3 rounded-md ring-background"
       />
     </span>
   );
@@ -926,6 +934,7 @@ function sameProfile(
     left.displayName === right.displayName &&
     left.avatarThumbSrc === right.avatarThumbSrc &&
     left.avatarFullSrc === right.avatarFullSrc &&
+    left.avatarFallbackReady === right.avatarFallbackReady &&
     left.email === right.email &&
     left.jobTitle === right.jobTitle &&
     left.department === right.department &&
@@ -946,6 +955,7 @@ export function messageRowPropsEqual(
   return (
     prev.entry === next.entry &&
     prev.avatarSrc === next.avatarSrc &&
+    prev.avatarFallbackReady === next.avatarFallbackReady &&
     prev.showMeta === next.showMeta &&
     prev.presence === next.presence &&
     prev.isHighlighted === next.isHighlighted &&
@@ -961,6 +971,7 @@ export function messageRowPropsEqual(
 function MessageRowComponent({
   entry,
   avatarSrc,
+  avatarFallbackReady = true,
   showMeta,
   profile,
   presence,
@@ -973,6 +984,7 @@ function MessageRowComponent({
 }: {
   entry: DisplayMessage;
   avatarSrc?: string;
+  avatarFallbackReady?: boolean;
   showMeta: boolean;
   profile?: ProfileData | null;
   presence?: PresenceInfo | null;
@@ -991,14 +1003,14 @@ function MessageRowComponent({
     >
       <div
         className={cn(
-          "relative flex gap-3 px-5 transition-colors duration-150",
+          "relative flex gap-1.5 px-5 transition-colors duration-150",
           "group-hover/msg:bg-accent/40",
           showMeta ? "py-1 mt-2 pt-1" : "py-0.5",
           isHighlighted && "message-highlight-enter",
         )}
       >
         {/* Avatar column */}
-        <div className={cn("w-14 shrink-0", showMeta ? "pt-0.5" : "pt-1")}>
+        <div className={cn("w-10 shrink-0", showMeta ? "pt-0.5" : "pt-1")}>
           {showMeta ? (
             <ProfileTrigger
               profile={profile ?? null}
@@ -1008,6 +1020,7 @@ function MessageRowComponent({
                 src={avatarSrc}
                 name={entry.displayName}
                 presence={entry.self ? null : presence}
+                fallbackReady={avatarFallbackReady}
               />
             </ProfileTrigger>
           ) : (
