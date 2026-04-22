@@ -68,7 +68,6 @@ const OLDER_PREFETCH_ROOT_MARGIN = "2200px 0px 0px 0px";
 const SCROLL_RESTORE_EPSILON_PX = 0.75;
 const EXPECTED_OLDER_FETCH_MS = 1500;
 const MAX_VELOCITY_PREFETCH_BONUS_PX = 6000;
-const TOP_BRAKE_SCROLL_PX = 96;
 
 type ScrollRestoreAnchor = {
   messageId: string | null;
@@ -170,27 +169,6 @@ export function shouldPrefetchOlderMessages(
   return scrollTop <= olderPrefetchThresholdForVelocity(upwardVelocityPxPerMs);
 }
 
-export function shouldApplyOlderHistoryBrake(
-  scrollTop: number,
-  loadingOlder: boolean,
-): boolean {
-  return loadingOlder && scrollTop < TOP_BRAKE_SCROLL_PX;
-}
-
-export function shouldEagerRenderMessage(
-  messageIndex: number,
-  messageCount: number,
-  highlightedMessageId: string | null,
-  messageId: string,
-  hasActiveSearch: boolean,
-): boolean {
-  return (
-    messageIndex >= messageCount - 24 ||
-    highlightedMessageId === messageId ||
-    hasActiveSearch
-  );
-}
-
 export type ThreadViewHandle = {
   submitSearch: (query: string) => void;
 };
@@ -228,6 +206,32 @@ export function profileMessageConversationId(
   if (conversationKind === "dm") return undefined;
   return sharedConversations.find((conversation) => conversation.kind === "dm")
     ?.id;
+}
+
+export function mergeThreadSnapshots(
+  primary: ThreadQueryData | null | undefined,
+  secondary: ThreadQueryData | null | undefined,
+): ThreadQueryData | null {
+  const left = primary ?? null;
+  const right = secondary ?? null;
+  if (!left && !right) return null;
+  const mergedMessages = sortMessagesByTimestamp([
+    ...new Map(
+      [...(left?.messages ?? []), ...(right?.messages ?? [])].map((message) => [
+        message.id,
+        message,
+      ]),
+    ).values(),
+  ]);
+  const olderPageUrl = left?.olderPageUrl ?? right?.olderPageUrl ?? null;
+  return {
+    messages: mergedMessages,
+    olderPageUrl,
+    moreOlder:
+      (left?.moreOlder ?? false) ||
+      (right?.moreOlder ?? false) ||
+      (olderPageUrl != null && mergedMessages.length > 0),
+  };
 }
 
 export const ThreadView = forwardRef<ThreadViewHandle, ThreadViewProps>(
@@ -333,7 +337,14 @@ export const ThreadView = forwardRef<ThreadViewHandle, ThreadViewProps>(
       retry: 1,
     });
 
-    const threadData = threadQuery.data ?? cachedThreadQuery.data?.data ?? null;
+    const threadData = useMemo(
+      () =>
+        mergeThreadSnapshots(
+          threadQuery.data,
+          cachedThreadQuery.data?.data ?? null,
+        ),
+      [cachedThreadQuery.data?.data, threadQuery.data],
+    );
     const rawMessages = threadData?.messages ?? [];
     const threadMembers = threadMembersQuery.data ?? [];
     const threadLoading =
@@ -949,12 +960,6 @@ export const ThreadView = forwardRef<ThreadViewHandle, ThreadViewProps>(
         scrollFrameRef.current = null;
         const el = viewportRef.current;
         if (!el) return;
-        if (
-          shouldApplyOlderHistoryBrake(el.scrollTop, loadingOlderRef.current)
-        ) {
-          el.scrollTop = TOP_BRAKE_SCROLL_PX;
-          return;
-        }
         if (!shouldPrefetchOlderMessages(el.scrollTop, upwardVelocityPxPerMs)) {
           return;
         }

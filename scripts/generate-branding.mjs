@@ -10,9 +10,9 @@ const rootDir = path.resolve(
 const brandingDir = path.join(rootDir, "assets", "branding");
 const generatedDir = path.join(brandingDir, "generated");
 const publicDir = path.join(rootDir, "public");
-const iconSvg = path.join(brandingDir, "icon.svg");
+const srcTauriIconsDir = path.join(rootDir, "src-tauri", "icons");
+const iconSourcePng = path.join(brandingDir, "icon-source.png");
 const traySvg = path.join(brandingDir, "tray-template.svg");
-const socialSvg = path.join(brandingDir, "social-card.svg");
 const iconsetDir = path.join(generatedDir, "better-teams.iconset");
 
 function run(command, args) {
@@ -36,15 +36,51 @@ function renderPng(svgPath, outputPath, width, height = width) {
   ]);
 }
 
+function resizePng(sourcePath, outputPath, width, height = width) {
+  const size = `${width}x${height}`;
+  run("magick", [
+    sourcePath,
+    "-resize",
+    size,
+    "-background",
+    "none",
+    "-gravity",
+    "center",
+    "-extent",
+    size,
+    outputPath,
+  ]);
+}
+
+function renderSocialCard(outputPath) {
+  run("magick", [
+    "-size",
+    "1200x630",
+    "gradient:#1E1B4B-#312E81",
+    "(",
+    iconSourcePng,
+    "-resize",
+    "180x180",
+    ")",
+    "-gravity",
+    "center",
+    "-geometry",
+    "+0-54",
+    "-composite",
+    outputPath,
+  ]);
+}
+
 ensureDir(generatedDir);
 ensureDir(publicDir);
+ensureDir(srcTauriIconsDir);
 rmSync(iconsetDir, { recursive: true, force: true });
 ensureDir(iconsetDir);
 
 const squareSizes = [16, 32, 48, 64, 128, 180, 192, 256, 512, 1024];
 
 for (const size of squareSizes) {
-  renderPng(iconSvg, path.join(generatedDir, `icon-${size}.png`), size);
+  resizePng(iconSourcePng, path.join(generatedDir, `icon-${size}.png`), size);
 }
 
 cpSync(
@@ -71,7 +107,6 @@ cpSync(
   path.join(generatedDir, "icon-16.png"),
   path.join(publicDir, "favicon-16x16.png"),
 );
-cpSync(iconSvg, path.join(publicDir, "favicon.svg"));
 
 // Generate Windows ICO from multiple sizes
 run("magick", [
@@ -113,9 +148,42 @@ run("iconutil", [
   path.join(generatedDir, "icon.icns"),
 ]);
 
+cpSync(
+  path.join(generatedDir, "icon-128.png"),
+  path.join(srcTauriIconsDir, "128x128.png"),
+);
+cpSync(
+  path.join(generatedDir, "icon-256.png"),
+  path.join(srcTauriIconsDir, "128x128@2x.png"),
+);
+cpSync(
+  path.join(generatedDir, "icon-32.png"),
+  path.join(srcTauriIconsDir, "32x32.png"),
+);
+cpSync(
+  path.join(generatedDir, "icon-512.png"),
+  path.join(srcTauriIconsDir, "512x512.png"),
+);
+cpSync(
+  path.join(generatedDir, "icon-1024.png"),
+  path.join(srcTauriIconsDir, "512x512@2x.png"),
+);
+cpSync(
+  path.join(generatedDir, "icon.icns"),
+  path.join(srcTauriIconsDir, "icon.icns"),
+);
+cpSync(
+  path.join(generatedDir, "icon.ico"),
+  path.join(srcTauriIconsDir, "icon.ico"),
+);
+cpSync(
+  path.join(generatedDir, "icon-128.png"),
+  path.join(srcTauriIconsDir, "icon.png"),
+);
+
 // Generate tray icons
-renderPng(iconSvg, path.join(generatedDir, "tray.png"), 32);
+resizePng(iconSourcePng, path.join(generatedDir, "tray.png"), 32);
 renderPng(traySvg, path.join(generatedDir, "trayTemplate.png"), 32);
 
 // Generate social card PNG
-renderPng(socialSvg, path.join(publicDir, "social-card.png"), 1200, 630);
+renderSocialCard(path.join(publicDir, "social-card.png"));

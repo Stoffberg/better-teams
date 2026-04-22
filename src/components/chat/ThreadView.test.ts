@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
+import type { Message } from "@/services/teams/types";
 import {
   captureScrollRestoreAnchor,
+  mergeThreadSnapshots,
   olderPrefetchThresholdForVelocity,
   profileMessageConversationId,
   restoreScrollRestoreAnchor,
-  shouldApplyOlderHistoryBrake,
-  shouldEagerRenderMessage,
   shouldPrefetchOlderMessages,
 } from "./ThreadView";
 
@@ -106,23 +106,40 @@ describe("older message prefetch", () => {
     expect(shouldPrefetchOlderMessages(3200, 2)).toBe(true);
     expect(shouldPrefetchOlderMessages(3200, 0.2)).toBe(false);
   });
-
-  it("applies a top brake while older history is loading", () => {
-    expect(shouldApplyOlderHistoryBrake(95, true)).toBe(true);
-    expect(shouldApplyOlderHistoryBrake(96, true)).toBe(false);
-    expect(shouldApplyOlderHistoryBrake(40, false)).toBe(false);
-  });
 });
 
-describe("eager message rendering", () => {
-  it("does not force newly prepended older messages into eager mode", () => {
-    expect(shouldEagerRenderMessage(0, 200, null, "m-1", false)).toBe(false);
-    expect(shouldEagerRenderMessage(12, 200, null, "m-13", false)).toBe(false);
-  });
+describe("thread snapshot merge", () => {
+  it("keeps cached older messages when live data arrives", () => {
+    const oldMessage = {
+      id: "m-1",
+      from: "8:a",
+      conversationId: "c1",
+      originalarrivaltime: "2026-04-21T10:00:00.000Z",
+    } as Message;
+    const liveMessage = {
+      id: "m-2",
+      from: "8:a",
+      conversationId: "c1",
+      originalarrivaltime: "2026-04-21T10:05:00.000Z",
+    } as Message;
 
-  it("keeps the recent tail, highlights, and active search eager", () => {
-    expect(shouldEagerRenderMessage(199, 200, null, "m-200", false)).toBe(true);
-    expect(shouldEagerRenderMessage(12, 200, "m-13", "m-13", false)).toBe(true);
-    expect(shouldEagerRenderMessage(12, 200, null, "m-13", true)).toBe(true);
+    expect(
+      mergeThreadSnapshots(
+        {
+          messages: [liveMessage],
+          olderPageUrl: "live-older",
+          moreOlder: true,
+        },
+        {
+          messages: [oldMessage, liveMessage],
+          olderPageUrl: "cached-older",
+          moreOlder: true,
+        },
+      ),
+    ).toEqual({
+      messages: [oldMessage, liveMessage],
+      olderPageUrl: "live-older",
+      moreOlder: true,
+    });
   });
 });
