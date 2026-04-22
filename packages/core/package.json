@@ -1,0 +1,22 @@
+{
+  "name": "@better-teams/core",
+  "type": "module",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts",
+    "./chat": "./src/chat.ts",
+    "./chat/*": "./src/chat/*.ts",
+    "./runtime": "./src/runtime.ts",
+    "./shared-conversation-index": "./src/shared-conversation-index.ts",
+    "./teams": "./src/teams/index.ts",
+    "./teams/*": "./src/teams/*.ts",
+    "./teams-client-factory": "./src/teams-client-factory.ts",
+    "./teams-presence": "./src/teams-presence.ts",
+    "./teams-profile-avatars": "./src/teams-profile-avatars.ts",
+    "./thread": "./src/thread.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "cd ../.. && vitest run packages/core/src"
+  }
+}
