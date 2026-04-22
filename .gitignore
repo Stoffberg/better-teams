@@ -11,3 +11,9 @@ test-results/
 *.dmg
 *.zip
 .DS_Store
+!README.md
+!SECURITY.md
+!CONTRIBUTING.md
+!CODE_OF_CONDUCT.md
+!.github/
+!.github/*.md

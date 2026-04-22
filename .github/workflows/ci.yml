@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.10
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Check
+        run: bun run check
+
+      - name: Unit tests with coverage
+        run: bun run test:coverage
+
+      - name: Package app
+        run: bun run package
+
+      - name: Packaged smoke test
+        run: bun run test:e2e
+
+      - name: Upload packaged app
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: better-teams-package-${{ github.run_id }}
+          path: out/
+          if-no-files-found: ignore
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: better-teams-coverage-${{ github.run_id }}
+          path: coverage/
+          if-no-files-found: ignore
