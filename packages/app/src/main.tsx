@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import "@fontsource-variable/figtree";
 import { App } from "./App";
 import { ErrorBoundary } from "./ErrorBoundary";
-import { registerDesktopTeamsRuntime } from "./lib/electron-bridge";
+import { registerDesktopTeamsRuntime } from "./services/desktop/runtime";
 import "./index.css";
 
 registerDesktopTeamsRuntime();

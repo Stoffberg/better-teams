@@ -1,1 +1,1 @@
-export type { MessageInlinePart } from "../chat-format";
+export type { MessageInlinePart } from "./format";

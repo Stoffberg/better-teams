@@ -4,4 +4,4 @@ export {
   messageReadStatus,
   messageReadTimestamp,
   parseConsumptionHorizon,
-} from "../chat-format";
+} from "./format";

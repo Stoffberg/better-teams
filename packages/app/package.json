@@ -4,9 +4,10 @@
   "private": true,
   "exports": {
     ".": "./src/App.tsx",
-    "./components/*": "./src/components/*.tsx",
-    "./lib/*": "./src/lib/*.ts",
-    "./providers/*": "./src/providers/*.tsx"
+    "./features/*": "./src/features/*",
+    "./platform/*": "./src/platform/*",
+    "./providers/*": "./src/providers/*",
+    "./services/*": "./src/services/*"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",

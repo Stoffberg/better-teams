@@ -23,24 +23,24 @@ contextBridge.exposeInMainWorld("betterTeams", {
   teams: {
     extractTokens: async () =>
       RawTokenSchema.array().parse(await invoke("teams:extractTokens")),
-    getAuthToken: (tenantId: string | null) =>
-      RawTokenSchema.nullable().parseAsync(
-        invoke("teams:getAuthToken", TenantIdSchema.parse(tenantId)),
+    getAuthToken: async (tenantId: string | null) =>
+      RawTokenSchema.nullable().parse(
+        await invoke("teams:getAuthToken", TenantIdSchema.parse(tenantId)),
       ),
     getAvailableAccounts: async () =>
       AccountOptionSchema.array().parse(
         await invoke("teams:getAvailableAccounts"),
       ),
-    getCachedPresence: (userMris: string[]) =>
-      PresenceEntrySchema.array().parseAsync(
-        invoke(
+    getCachedPresence: async (userMris: string[]) =>
+      PresenceEntrySchema.array().parse(
+        await invoke(
           "teams:getCachedPresence",
           PresenceRequestSchema.parse(userMris),
         ),
       ),
   },
   images: {
-    cacheImageFile: (
+    cacheImageFile: async (
       cacheKey: string,
       bytes: Uint8Array,
       extension: string | null,
@@ -50,8 +50,8 @@ contextBridge.exposeInMainWorld("betterTeams", {
         bytes,
         extension,
       });
-      return ImageCachePathSchema.parseAsync(
-        invoke(
+      return ImageCachePathSchema.parse(
+        await invoke(
           "images:cacheFile",
           request.cacheKey,
           Array.from(request.bytes),
@@ -59,15 +59,21 @@ contextBridge.exposeInMainWorld("betterTeams", {
         ),
       );
     },
-    getCachedImageFile: (cacheKey: string) =>
-      ImageCachePathSchema.nullable().parseAsync(
-        invoke("images:getCachedFile", ImageCachePathSchema.parse(cacheKey)),
+    getCachedImageFile: async (cacheKey: string) =>
+      ImageCachePathSchema.nullable().parse(
+        await invoke(
+          "images:getCachedFile",
+          ImageCachePathSchema.parse(cacheKey),
+        ),
       ),
-    hasCachedImageFile: (filePath: string) =>
+    hasCachedImageFile: async (filePath: string) =>
       z
         .boolean()
-        .parseAsync(
-          invoke("images:hasCachedFile", ImageCachePathSchema.parse(filePath)),
+        .parse(
+          await invoke(
+            "images:hasCachedFile",
+            ImageCachePathSchema.parse(filePath),
+          ),
         ),
     filePathToAssetUrl: (filePath: string) =>
       `better-teams-asset://file/${encodeURIComponent(
@@ -81,7 +87,8 @@ contextBridge.exposeInMainWorld("betterTeams", {
       ),
   },
   shell: {
-    openExternal: (url: string) =>
-      invoke("shell:openExternal", ShellOpenExternalUrlSchema.parse(url)),
+    openExternal: async (url: string) => {
+      await invoke("shell:openExternal", ShellOpenExternalUrlSchema.parse(url));
+    },
   },
 } satisfies BetterTeamsDesktopApi);

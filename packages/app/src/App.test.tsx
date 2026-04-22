@@ -1,11 +1,11 @@
-import { ChatWorkspace } from "@better-teams/app/components/chat/ChatWorkspace";
+import { ChatWorkspace } from "@better-teams/app/features/chat/workspace/ChatWorkspace";
 import { TeamsAccountProvider } from "@better-teams/app/providers/TeamsAccountProvider";
 import { ThemeProvider } from "@better-teams/app/providers/ThemeProvider";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@better-teams/core/teams-client-factory", () => ({
+vi.mock("@better-teams/core/teams/client/factory", () => ({
   getOrCreateClient: vi.fn().mockResolvedValue({
     initialize: vi.fn().mockResolvedValue(undefined),
     account: {
@@ -32,7 +32,7 @@ vi.mock("@better-teams/core/teams-client-factory", () => ({
   clearClientCache: vi.fn(),
 }));
 
-vi.mock("@better-teams/app/lib/electron-bridge", () => ({
+vi.mock("@better-teams/app/services/desktop/runtime", () => ({
   cacheImageFile: vi.fn(),
   extractTokens: vi.fn().mockResolvedValue([
     {

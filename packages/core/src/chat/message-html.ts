@@ -9,4 +9,4 @@ export {
   normalizePreviewText,
   parseMessageQuoteAndBody,
   textLooksLikeTeamsCallLogStub,
-} from "../chat-format";
+} from "./format";

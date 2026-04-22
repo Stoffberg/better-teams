@@ -1,1 +1,1 @@
-export type { MessageReference } from "../chat-format";
+export type { MessageReference } from "./format";

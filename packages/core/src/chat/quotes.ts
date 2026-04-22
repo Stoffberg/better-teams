@@ -1,1 +1,1 @@
-export { parseMessageQuoteAndBody } from "../chat-format";
+export { parseMessageQuoteAndBody } from "./format";

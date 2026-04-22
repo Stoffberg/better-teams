@@ -1,1 +1,1 @@
-export * from "./teams-thread-query";
+export * from "./teams/thread";

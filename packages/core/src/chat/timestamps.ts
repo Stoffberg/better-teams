@@ -6,4 +6,4 @@ export {
   formatThreadDayDividerLabel,
   gapBetweenMessages,
   messageTimestamp,
-} from "../chat-format";
+} from "./format";

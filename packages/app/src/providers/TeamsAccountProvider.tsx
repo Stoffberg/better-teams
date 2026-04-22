@@ -1,16 +1,13 @@
 import {
   extractTokens,
   getAvailableAccounts,
-} from "@better-teams/app/lib/electron-bridge";
-import { teamsKeys } from "@better-teams/app/lib/teams-query-keys";
+} from "@better-teams/app/services/desktop/runtime";
+import { teamsKeys } from "@better-teams/app/services/teams/query-keys";
+import { teamsSessionService } from "@better-teams/app/services/teams/session";
 import type {
   TeamsAccountOption,
   TeamsSessionInfo,
 } from "@better-teams/core/teams/types";
-import {
-  clearClientForTenant,
-  getOrCreateClient,
-} from "@better-teams/core/teams-client-factory";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createContext,
@@ -166,15 +163,7 @@ function resolveSelectedTenantId(
 async function initializeTeamsSession(
   tenantId?: string | null,
 ): Promise<TeamsSessionInfo> {
-  const client = await getOrCreateClient(tenantId ?? undefined);
-  const a = client.account;
-  return {
-    upn: a.upn,
-    tenantId: a.tenantId ?? "__default__",
-    skypeId: a.skypeId,
-    expiresAt: a.expiresAt?.toISOString() ?? null,
-    region: a.region,
-  };
+  return teamsSessionService.initialize(tenantId);
 }
 
 export function TeamsAccountProvider({ children }: { children: ReactNode }) {
@@ -237,7 +226,7 @@ export function TeamsAccountProvider({ children }: { children: ReactNode }) {
       const previousTenantId = persistedPreference;
       setPersistedPreference(nextTenantId);
       setPendingTenantId(nextTenantId);
-      clearClientForTenant(nextTenantId);
+      teamsSessionService.clearTenantClient(nextTenantId);
       void queryClient
         .fetchQuery({
           queryKey: teamsKeys.session(nextTenantId),
@@ -252,7 +241,7 @@ export function TeamsAccountProvider({ children }: { children: ReactNode }) {
         })
         .catch(() => {
           setPersistedPreference(previousTenantId);
-          clearClientForTenant(nextTenantId);
+          teamsSessionService.clearTenantClient(nextTenantId);
           setPendingTenantId((current) =>
             current === nextTenantId ? null : current,
           );

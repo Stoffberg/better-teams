@@ -11,4 +11,4 @@ export {
   isCompanyCommunicationsSidebarThread,
   partitionConversationsByKind,
   sortConversationsByActivity,
-} from "../chat-format";
+} from "./format";

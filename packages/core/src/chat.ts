@@ -1,5 +1,6 @@
 export * from "./chat/attachments";
 export * from "./chat/conversation";
+export * from "./chat/format";
 export * from "./chat/mentions";
 export * from "./chat/message-html";
 export * from "./chat/message-references";

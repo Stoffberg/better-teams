@@ -1,4 +1,4 @@
-import { ChatWorkspace } from "@better-teams/app/components/chat/ChatWorkspace";
+import { ChatWorkspace } from "@better-teams/app/features/chat/workspace/ChatWorkspace";
 import { QueryProvider } from "@better-teams/app/providers/QueryProvider";
 import { TeamsAccountProvider } from "@better-teams/app/providers/TeamsAccountProvider";
 import { ThemeProvider } from "@better-teams/app/providers/ThemeProvider";

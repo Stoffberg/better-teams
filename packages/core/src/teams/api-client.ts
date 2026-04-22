@@ -29,7 +29,7 @@ import {
   mriFromShortProfileRow,
   shortProfileRowToMriAndImageUrl,
   tenantNameFromShortProfileRow,
-} from "../teams-profile-avatars";
+} from "./profile/avatars";
 import {
   AuthzResponseSchema,
   ConversationSchema,
