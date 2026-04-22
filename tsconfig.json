@@ -13,20 +13,24 @@
     "moduleResolution": "bundler",
     "baseUrl": ".",
     "jsx": "react-jsx",
+    "types": ["vitest/globals", "@testing-library/jest-dom", "node"],
     "paths": {
-      "@/*": ["./src/*"]
+      "@better-teams/app/*": ["./packages/app/src/*"],
+      "@better-teams/core": ["./packages/core/src/index.ts"],
+      "@better-teams/core/*": ["./packages/core/src/*"],
+      "@better-teams/desktop-electron/preload": [
+        "./packages/desktop-electron/src/preload/contracts.ts"
+      ],
+      "@better-teams/ui": ["./packages/ui/src/index.ts"],
+      "@better-teams/ui/*": ["./packages/ui/src/*"]
     }
   },
   "include": [
-    "src/**/*.ts",
-    "src/**/*.tsx",
-    "src/**/*.d.ts",
-    "electron/**/*.ts",
+    "packages/**/*.ts",
+    "packages/**/*.tsx",
+    "packages/**/*.d.ts",
     "e2e/**/*.ts",
     "forge.config.ts",
-    "vite.main.config.mts",
-    "vite.preload.config.mts",
-    "vite.config.mts",
     "vitest.config.ts",
     "vitest.setup.ts",
     "playwright.config.ts"

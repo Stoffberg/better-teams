@@ -15,20 +15,20 @@ const config = {
     new VitePlugin({
       build: [
         {
-          entry: "electron/main.ts",
-          config: "vite.main.config.mts",
+          entry: "packages/desktop-electron/src/main/main.ts",
+          config: "packages/desktop-electron/vite.main.config.mts",
           target: "main",
         },
         {
-          entry: "electron/preload.ts",
-          config: "vite.preload.config.mts",
+          entry: "packages/desktop-electron/src/preload/preload.ts",
+          config: "packages/desktop-electron/vite.preload.config.mts",
           target: "preload",
         },
       ],
       renderer: [
         {
           name: "main_window",
-          config: "vite.config.mts",
+          config: "packages/app/vite.config.mts",
         },
       ],
     }),

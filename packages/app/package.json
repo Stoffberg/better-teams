@@ -1,0 +1,16 @@
+{
+  "name": "@better-teams/app",
+  "type": "module",
+  "private": true,
+  "exports": {
+    ".": "./src/App.tsx",
+    "./features/*": "./src/features/*",
+    "./platform/*": "./src/platform/*",
+    "./providers/*": "./src/providers/*",
+    "./services/*": "./src/services/*"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "cd ../.. && vitest run packages/app/src"
+  }
+}

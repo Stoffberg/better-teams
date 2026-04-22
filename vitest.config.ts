@@ -10,13 +10,19 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      "@better-teams/app": path.resolve(__dirname, "./packages/app/src"),
+      "@better-teams/core": path.resolve(__dirname, "./packages/core/src"),
+      "@better-teams/desktop-electron/preload": path.resolve(
+        __dirname,
+        "./packages/desktop-electron/src/preload/contracts.ts",
+      ),
+      "@better-teams/ui": path.resolve(__dirname, "./packages/ui/src"),
     },
   },
   test: {
     globals: true,
     environment: "happy-dom",
     setupFiles: ["./vitest.setup.ts"],
-    include: ["src/**/*.test.{ts,tsx}"],
+    include: ["packages/**/*.test.{ts,tsx}"],
   },
 });

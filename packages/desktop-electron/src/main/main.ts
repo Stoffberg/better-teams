@@ -1,0 +1,237 @@
+import path from "node:path";
+import { pathToFileURL } from "node:url";
+import {
+  app,
+  BrowserWindow,
+  ipcMain,
+  Menu,
+  nativeImage,
+  net,
+  protocol,
+  shell,
+  Tray,
+} from "electron";
+import started from "electron-squirrel-startup";
+import {
+  FetchRequestSchema,
+  ImageCacheIpcRequestSchema,
+  ImageCachePathSchema,
+  PresenceRequestSchema,
+  ShellOpenExternalUrlSchema,
+  TenantIdSchema,
+} from "../preload/contracts";
+import { performFetch } from "./http";
+import {
+  cacheImageFile,
+  getCachedImageFile,
+  hasCachedImageFile,
+} from "./image-cache";
+import {
+  extractTokens,
+  getAuthToken,
+  getAvailableAccounts,
+  getCachedPresence,
+} from "./token-store";
+
+if (started) {
+  app.quit();
+}
+
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: "better-teams-asset",
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: false,
+    },
+  },
+]);
+
+app.setName("Better Teams");
+if (process.platform === "darwin") {
+  app.setPath(
+    "userData",
+    path.join(app.getPath("appData"), "com.betterteams.app"),
+  );
+}
+
+let mainWindow: BrowserWindow | null = null;
+let tray: Tray | null = null;
+let isQuitting = false;
+
+const singleInstanceLock = app.requestSingleInstanceLock();
+if (!singleInstanceLock) {
+  app.quit();
+}
+
+registerIpc();
+
+app.whenReady().then(() => {
+  protocol.handle("better-teams-asset", (request) => {
+    try {
+      const filePath = filePathFromAssetUrl(request.url);
+      if (!hasCachedImageFile(filePath)) {
+        return new Response(null, { status: 404 });
+      }
+      return net.fetch(pathToFileURL(filePath).toString());
+    } catch {
+      return new Response(null, { status: 404 });
+    }
+  });
+  createWindow();
+  createTray();
+});
+
+app.on("second-instance", () => {
+  showMainWindow();
+});
+
+app.on("before-quit", () => {
+  isQuitting = true;
+});
+
+app.on("window-all-closed", () => {
+  if (process.platform !== "darwin") {
+    app.quit();
+  }
+});
+
+app.on("activate", () => {
+  if (BrowserWindow.getAllWindows().length === 0) {
+    createWindow();
+  } else {
+    showMainWindow();
+  }
+});
+
+function createWindow(): void {
+  mainWindow = new BrowserWindow({
+    width: 1280,
+    height: 860,
+    minWidth: 980,
+    minHeight: 640,
+    title: "Better Teams",
+    icon: resourcePath("resources/icon.png"),
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  mainWindow.on("close", (event) => {
+    if (isQuitting) return;
+    event.preventDefault();
+    mainWindow?.hide();
+  });
+
+  const devServerUrl = MAIN_WINDOW_VITE_DEV_SERVER_URL?.replace(
+    "://localhost:",
+    "://127.0.0.1:",
+  );
+  if (devServerUrl) {
+    const windowRef = mainWindow;
+    void waitForUrl(devServerUrl).then(() => {
+      if (!windowRef.isDestroyed()) {
+        void windowRef.loadURL(devServerUrl);
+      }
+    });
+  } else {
+    void mainWindow.loadFile(
+      path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`),
+    );
+  }
+}
+
+async function waitForUrl(url: string): Promise<void> {
+  for (let attempt = 0; attempt < 80; attempt += 1) {
+    try {
+      const response = await fetch(url);
+      if (response.ok) return;
+    } catch {
+      await sleep(250);
+    }
+  }
+  throw new Error(`Timed out waiting for ${url}`);
+}
+
+async function sleep(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function createTray(): void {
+  const icon = nativeImage.createFromPath(resourcePath("resources/icon.png"));
+  tray = new Tray(icon);
+  tray.setToolTip("Better Teams");
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      { label: "Show Better Teams", click: showMainWindow },
+      {
+        label: "Quit",
+        click: () => {
+          isQuitting = true;
+          app.quit();
+        },
+      },
+    ]),
+  );
+  tray.on("click", showMainWindow);
+}
+
+function showMainWindow(): void {
+  if (!mainWindow) {
+    createWindow();
+  }
+  mainWindow?.show();
+  if (mainWindow?.isMinimized()) mainWindow.restore();
+  mainWindow?.focus();
+}
+
+function registerIpc(): void {
+  ipcMain.handle("teams:extractTokens", () => extractTokens());
+  ipcMain.handle("teams:getAuthToken", (_event, tenantId) =>
+    getAuthToken(TenantIdSchema.parse(tenantId)),
+  );
+  ipcMain.handle("teams:getAvailableAccounts", () => getAvailableAccounts());
+  ipcMain.handle("teams:getCachedPresence", (_event, userMris) =>
+    getCachedPresence(PresenceRequestSchema.parse(userMris)),
+  );
+  ipcMain.handle("images:cacheFile", (_event, cacheKey, bytes, extension) => {
+    const request = ImageCacheIpcRequestSchema.parse({
+      cacheKey,
+      bytes,
+      extension,
+    });
+    return cacheImageFile(
+      request.cacheKey,
+      Uint8Array.from(request.bytes),
+      request.extension,
+    );
+  });
+  ipcMain.handle("images:getCachedFile", (_event, cacheKey) =>
+    getCachedImageFile(ImageCachePathSchema.parse(cacheKey)),
+  );
+  ipcMain.handle("images:hasCachedFile", (_event, filePath) =>
+    hasCachedImageFile(ImageCachePathSchema.parse(filePath)),
+  );
+  ipcMain.handle("http:fetch", (_event, request) =>
+    performFetch(FetchRequestSchema.parse(request)),
+  );
+  ipcMain.handle("shell:openExternal", (_event, url) =>
+    shell.openExternal(ShellOpenExternalUrlSchema.parse(url)),
+  );
+}
+
+function resourcePath(relativePath: string): string {
+  return path.join(app.getAppPath(), relativePath);
+}
+
+function filePathFromAssetUrl(assetUrl: string): string {
+  const parsed = new URL(assetUrl);
+  if (parsed.hostname !== "file") {
+    throw new Error("Invalid asset host");
+  }
+  return decodeURIComponent(parsed.pathname.slice(1));
+}

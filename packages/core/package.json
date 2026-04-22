@@ -1,0 +1,28 @@
+{
+  "name": "@better-teams/core",
+  "type": "module",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts",
+    "./chat": "./src/chat.ts",
+    "./chat/*": "./src/chat/*.ts",
+    "./runtime": "./src/runtime.ts",
+    "./teams": "./src/teams/index.ts",
+    "./teams/client": "./src/teams/client/index.ts",
+    "./teams/client/*": "./src/teams/client/*.ts",
+    "./teams/conversation": "./src/teams/conversation/index.ts",
+    "./teams/conversation/*": "./src/teams/conversation/*.ts",
+    "./teams/presence": "./src/teams/presence/index.ts",
+    "./teams/presence/*": "./src/teams/presence/*.ts",
+    "./teams/profile": "./src/teams/profile/index.ts",
+    "./teams/profile/*": "./src/teams/profile/*.ts",
+    "./teams/thread": "./src/teams/thread/index.ts",
+    "./teams/thread/*": "./src/teams/thread/*.ts",
+    "./teams/*": "./src/teams/*.ts",
+    "./thread": "./src/thread.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "cd ../.. && vitest run packages/core/src"
+  }
+}
