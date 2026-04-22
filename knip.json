@@ -1,0 +1,20 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "electron/main.ts",
+    "electron/preload.ts",
+    "forge.config.ts",
+    "vite.main.config.mts",
+    "vite.preload.config.mts"
+  ],
+  "project": [
+    "src/**/*.{ts,tsx}",
+    "src/**/*.css",
+    "electron/**/*.ts",
+    "scripts/**/*.{ts,mjs}",
+    "*.config.{ts,mts}",
+    "vite*.config.mts"
+  ],
+  "ignore": ["src/components/ui/**"],
+  "ignoreDependencies": ["@vitest/coverage-v8"]
+}

@@ -55,7 +55,7 @@ export function normalizeTeamsTimestamp(value: unknown): string {
   return trimmed;
 }
 
-export function parseCountish(value: unknown): number {
+function parseCountish(value: unknown): number {
   if (value == null) return 0;
   if (typeof value === "number" && Number.isFinite(value)) {
     return Math.max(0, Math.floor(value));

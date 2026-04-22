@@ -25,13 +25,13 @@ export type MessageAttachment = {
   fileExtension?: string;
 };
 
-export type ParsedConsumptionHorizon = {
+type ParsedConsumptionHorizon = {
   sequenceId: number;
   timestamp: number;
   messageId: string;
 };
 
-export type MessageReadStatus = "sending" | "sent" | "delivered" | "read";
+type MessageReadStatus = "sending" | "sent" | "delivered" | "read";
 
 export type MessageInlinePart =
   | {
@@ -597,7 +597,7 @@ function messageReferenceFromQuoteReference(
   return { conversationId, messageId };
 }
 
-export function messageQuoteReference(m: Message): MessageReference | null {
+function messageQuoteReference(m: Message): MessageReference | null {
   const qtdMsgs = m.properties?.qtdMsgs;
   if (Array.isArray(qtdMsgs)) {
     const ref = messageReferenceFromQuoteReference(
@@ -694,7 +694,7 @@ export function normalizePreviewText(text: string): string {
   return s;
 }
 
-export function normalizeThreadBody(text: string): string {
+function normalizeThreadBody(text: string): string {
   return text
     .replace(/\u00a0/g, " ")
     .replace(/\n{3,}/g, "\n\n")
@@ -1041,7 +1041,7 @@ export function parseMessageQuoteAndBody(html: string | undefined | null): {
   return { quote, body };
 }
 
-export function parseMessageRichQuoteAndBody(
+function parseMessageRichQuoteAndBody(
   html: string | undefined | null,
   message?: Message,
   conversationId?: string,
@@ -1097,7 +1097,7 @@ export function parseMessageRichQuoteAndBody(
   return { quote, body };
 }
 
-export function getMessageTextParts(content: string | undefined | null): {
+function getMessageTextParts(content: string | undefined | null): {
   quote: string | null;
   body: string;
 } {
@@ -1777,13 +1777,6 @@ export function sortConversationsByActivity(
   });
 }
 
-// ── Consumption Horizon & Read Receipts ──
-
-/**
- * Parse the Teams consumption horizon string.
- * Format: "sequenceId;timestamp;messageId"
- * e.g. "1711446123456;1711446123456;2132503743217489806"
- */
 export function parseConsumptionHorizon(
   raw: string | undefined | null,
 ): ParsedConsumptionHorizon | null {
@@ -1798,11 +1791,6 @@ export function parseConsumptionHorizon(
   return { sequenceId, timestamp, messageId };
 }
 
-/**
- * Determine read status for a self-sent message based on the peer's
- * consumption horizon. In a DM, there is one peer horizon. In a group,
- * you could have multiple — we use the highest (most-read) horizon.
- */
 export function messageReadStatus(
   message: Message,
   peerHorizons: ParsedConsumptionHorizon[],
@@ -1811,11 +1799,8 @@ export function messageReadStatus(
     message.sequenceId ?? (message.id ? Number(message.id) : Number.NaN);
   if (!Number.isFinite(seqId)) return "sent";
   if (peerHorizons.length === 0) return "sent";
-  // Check if any peer has read up to this message
   const anyRead = peerHorizons.some((h) => h.sequenceId >= seqId);
   if (anyRead) return "read";
-  // Delivered if message has been sent and is acknowledged
-  // (we know it's delivered since the server accepted it and gave it a sequenceId)
   return "delivered";
 }
 

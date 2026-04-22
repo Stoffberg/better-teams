@@ -28,6 +28,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
+import { Skeleton } from "../ui/skeleton";
 import { PresenceBadge } from "./PresenceBadge";
 import type { SidebarConversationItem } from "./types";
 
@@ -58,6 +59,48 @@ function favoriteButtonLabel(item: SidebarConversationItem): string {
   return item.isFavorite
     ? `Remove ${item.title} from favorites`
     : `Add ${item.title} to favorites`;
+}
+
+function SidebarHeaderSkeleton() {
+  return (
+    <div className="flex w-full items-center gap-3 rounded-xl px-2 py-2">
+      <Skeleton className="size-10 shrink-0 rounded-xl bg-sidebar-accent" />
+      <span className="min-w-0 flex-1 space-y-2">
+        <Skeleton className="h-3.5 w-24 bg-sidebar-accent" />
+        <Skeleton className="h-3 w-36 bg-sidebar-accent" />
+      </span>
+    </div>
+  );
+}
+
+const SIDEBAR_SKELETON_ROWS = [
+  { key: "a", width: "72%" },
+  { key: "b", width: "92%" },
+  { key: "c", width: "64%" },
+  { key: "d", width: "84%" },
+  { key: "e", width: "76%" },
+  { key: "f", width: "58%" },
+  { key: "g", width: "88%" },
+  { key: "h", width: "68%" },
+];
+
+function SidebarListSkeleton() {
+  return (
+    <div className="space-y-1.5 px-1">
+      {SIDEBAR_SKELETON_ROWS.map((row) => (
+        <div
+          key={row.key}
+          className="flex items-center gap-2.5 rounded-md px-2 py-1.5"
+        >
+          <Skeleton className="size-5 shrink-0 rounded-md bg-sidebar-accent" />
+          <Skeleton
+            className="h-3.5 bg-sidebar-accent"
+            style={{ width: row.width }}
+          />
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function ConversationRow({
@@ -319,6 +362,8 @@ export function Sidebar({
   onHoverConversationEnd,
   onToggleFavorite,
   searchInputRef,
+  accountLoading = false,
+  conversationsLoading = false,
 }: {
   upn?: string;
   selfAvatarSrc?: string;
@@ -338,6 +383,8 @@ export function Sidebar({
   onHoverConversationEnd: (conversationId: string) => void;
   onToggleFavorite: (conversationId: string, favorite: boolean) => void;
   searchInputRef: React.RefObject<HTMLInputElement | null>;
+  accountLoading?: boolean;
+  conversationsLoading?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query);
@@ -467,82 +514,86 @@ export function Sidebar({
     >
       {/* Workspace header */}
       <div className="border-b border-sidebar-border px-3 py-3">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              aria-label="Switch account"
-              disabled={switchPending}
-              className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors hover:bg-sidebar-accent disabled:opacity-60"
-            >
-              <Avatar className="size-10 border border-sidebar-border bg-sidebar-accent">
-                <AvatarImage src={_selfAvatarSrc} alt={activeEmail} />
-                <AvatarFallback className="bg-sidebar-accent text-[12px] font-semibold text-sidebar-foreground">
-                  {initialsFromLabel(activeWorkspaceLabel)}
-                </AvatarFallback>
-              </Avatar>
-              <span className="min-w-0 flex-1">
-                <span className="flex items-center gap-1.5">
-                  <span className="truncate text-[14px] font-semibold text-sidebar-foreground">
-                    {activeWorkspaceLabel}
-                  </span>
-                  <ChevronDown className="size-3.5 shrink-0 text-sidebar-muted" />
-                </span>
-                <span className="block truncate pt-0.5 text-[12px] text-sidebar-muted">
-                  {activeEmail}
-                </span>
-              </span>
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            align="start"
-            className="w-72 border-border bg-background p-1.5 text-foreground"
-          >
-            <DropdownMenuLabel className="px-2 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
-              Switch account
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator className="bg-border" />
-            <DropdownMenuRadioGroup
-              value={activeTenantId ?? "__default__"}
-              onValueChange={(value) =>
-                onSwitchAccount(value === "__default__" ? null : value)
-              }
-            >
-              {accounts.map((account) => (
-                <DropdownMenuRadioItem
-                  key={`${account.tenantId ?? "default"}:${account.upn ?? ""}`}
-                  value={account.tenantId ?? "__default__"}
-                  className="gap-3 rounded-lg py-2.5 pr-2.5 pl-8 focus:bg-accent focus:text-foreground"
-                >
-                  <Avatar size="sm">
-                    <AvatarImage
-                      src={
-                        account.tenantId
-                          ? accountAvatarByTenant[account.tenantId]
-                          : _selfAvatarSrc
-                      }
-                      alt={account.upn}
-                    />
-                    <AvatarFallback className="bg-accent text-[10px] text-muted-foreground">
-                      {(account.upn?.[0] ?? "?").toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="truncate text-[13px] font-semibold">
-                      {workspaceLabelFromUpn(account.upn)}
+        {accountLoading ? (
+          <SidebarHeaderSkeleton />
+        ) : (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                aria-label="Switch account"
+                disabled={switchPending}
+                className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors hover:bg-sidebar-accent disabled:opacity-60"
+              >
+                <Avatar className="size-10 border border-sidebar-border bg-sidebar-accent">
+                  <AvatarImage src={_selfAvatarSrc} alt={activeEmail} />
+                  <AvatarFallback className="bg-sidebar-accent text-[12px] font-semibold text-sidebar-foreground">
+                    {initialsFromLabel(activeWorkspaceLabel)}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-1.5">
+                    <span className="truncate text-[14px] font-semibold text-sidebar-foreground">
+                      {activeWorkspaceLabel}
                     </span>
-                    <span className="truncate text-[11px] text-muted-foreground">
-                      {account.upn ?? "Unknown account"}
-                    </span>
+                    <ChevronDown className="size-3.5 shrink-0 text-sidebar-muted" />
                   </span>
-                  {account.tenantId === activeTenantId ? (
-                    <Check className="size-4 text-primary" />
-                  ) : null}
-                </DropdownMenuRadioItem>
-              ))}
-            </DropdownMenuRadioGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
+                  <span className="block truncate pt-0.5 text-[12px] text-sidebar-muted">
+                    {activeEmail}
+                  </span>
+                </span>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="start"
+              className="w-72 border-border bg-background p-1.5 text-foreground"
+            >
+              <DropdownMenuLabel className="px-2 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+                Switch account
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator className="bg-border" />
+              <DropdownMenuRadioGroup
+                value={activeTenantId ?? "__default__"}
+                onValueChange={(value) =>
+                  onSwitchAccount(value === "__default__" ? null : value)
+                }
+              >
+                {accounts.map((account) => (
+                  <DropdownMenuRadioItem
+                    key={`${account.tenantId ?? "default"}:${account.upn ?? ""}`}
+                    value={account.tenantId ?? "__default__"}
+                    className="gap-3 rounded-lg py-2.5 pr-2.5 pl-8 focus:bg-accent focus:text-foreground"
+                  >
+                    <Avatar size="sm">
+                      <AvatarImage
+                        src={
+                          account.tenantId
+                            ? accountAvatarByTenant[account.tenantId]
+                            : _selfAvatarSrc
+                        }
+                        alt={account.upn}
+                      />
+                      <AvatarFallback className="bg-accent text-[10px] text-muted-foreground">
+                        {(account.upn?.[0] ?? "?").toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="flex min-w-0 flex-1 flex-col">
+                      <span className="truncate text-[13px] font-semibold">
+                        {workspaceLabelFromUpn(account.upn)}
+                      </span>
+                      <span className="truncate text-[11px] text-muted-foreground">
+                        {account.upn ?? "Unknown account"}
+                      </span>
+                    </span>
+                    {account.tenantId === activeTenantId ? (
+                      <Check className="size-4 text-primary" />
+                    ) : null}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
 
       {/* Global search */}
@@ -573,8 +624,10 @@ export function Sidebar({
 
       {/* Scrollable channel/DM list */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden px-2 pt-3 pb-2">
-        {filteredSidebarItems.items.length === 0 &&
-        allSidebarItems.length > 0 ? (
+        {conversationsLoading && allSidebarItems.length === 0 && !query ? (
+          <SidebarListSkeleton />
+        ) : filteredSidebarItems.items.length === 0 &&
+          allSidebarItems.length > 0 ? (
           <div className="flex flex-col items-center gap-2 px-4 py-16">
             <Search className="size-6 text-sidebar-muted/40" />
             <p className="text-center text-[13px] text-sidebar-muted/60">

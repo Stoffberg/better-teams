@@ -83,7 +83,7 @@ export type TeamsApiDiagnosticEvent = {
   data?: Record<string, unknown>;
 };
 
-export type TeamsApiClientOptions = {
+type TeamsApiClientOptions = {
   fetchImpl?: (
     input: RequestInfo | URL,
     init?: RequestInit,

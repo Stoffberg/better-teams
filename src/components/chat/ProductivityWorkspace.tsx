@@ -41,10 +41,11 @@ import { teamsKeys } from "@/lib/teams-query-keys";
 import { preloadConversationThread } from "@/lib/teams-thread-preload";
 import { useTeamsAccountContext } from "@/providers/TeamsAccountProvider";
 import type { Conversation, ConversationMember } from "@/services/teams/types";
+import { Skeleton } from "../ui/skeleton";
 import type { ComposerMentionCandidate } from "./Composer";
 import { Composer } from "./Composer";
 import type { ProfileData } from "./ProfileCard";
-import { ProfilePanel } from "./ProfileCard";
+import { ProfileSidebar } from "./ProfileCard";
 import { Sidebar } from "./Sidebar";
 import { ThreadHeader } from "./ThreadHeader";
 import { ThreadView, type ThreadViewHandle } from "./ThreadView";
@@ -88,6 +89,34 @@ function updateConversationFavoriteState(
   );
 }
 
+function MainLoadingSkeleton() {
+  return (
+    <div className="flex flex-1 flex-col px-8 py-8">
+      <div className="mb-8 flex items-center gap-3">
+        <Skeleton className="size-11 rounded-xl" />
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-44" />
+          <Skeleton className="h-3 w-28" />
+        </div>
+      </div>
+      <div className="space-y-6">
+        {[0.74, 0.48, 0.62].map((width) => (
+          <div key={width} className="flex gap-3">
+            <Skeleton className="size-9 shrink-0 rounded-xl" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-3.5 w-24" />
+              <Skeleton
+                className="h-10 rounded-xl"
+                style={{ width: `${width * 100}%` }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function TenantScopedWorkspace() {
   const queryClient = useQueryClient();
   const { activeTenantId, accounts, isSwitchingAccount, switchAccount } =
@@ -121,7 +150,7 @@ function TenantScopedWorkspace() {
     null,
   );
   const [announcement, setAnnouncement] = useState("");
-  const [isProfilePanelOpen, setIsProfilePanelOpen] = useState(false);
+  const [isProfileSidebarOpen, setIsProfileSidebarOpen] = useState(false);
   const [threadSearchQuery, setThreadSearchQuery] = useState("");
   const [threadSearchResultCount, setThreadSearchResultCount] = useState(0);
   const [selectionFocusTarget, setSelectionFocusTarget] = useState<
@@ -352,7 +381,7 @@ function TenantScopedWorkspace() {
       return byConversationId;
     },
     enabled:
-      isProfilePanelOpen &&
+      isProfileSidebarOpen &&
       Boolean(selectedProfileMri) &&
       sharedConversationCandidateIds.length > 0,
     staleTime: 5 * 60_000,
@@ -425,14 +454,14 @@ function TenantScopedWorkspace() {
               setAnnouncement(
                 `Ready to message ${displayNameByMri[mri] || selectedItem.title}`,
               );
-              setIsProfilePanelOpen(false);
+              setIsProfileSidebarOpen(false);
             },
       onOpenConversation: (conversationId: string) => {
         const item = sidebarItemById[conversationId];
         setSelectedId(conversationId);
         setSelectionFocusTarget("thread");
         setAnnouncement(item ? `Opened ${item.title}` : "Opened conversation");
-        setIsProfilePanelOpen(false);
+        setIsProfileSidebarOpen(false);
       },
       currentConversationId: selectedItem.id,
       sharedConversationHeading: `Other chats with ${displayNameByMri[mri] || selectedItem.title}`,
@@ -610,7 +639,7 @@ function TenantScopedWorkspace() {
         setThreadSearchQuery("");
         setThreadSearchResultCount(0);
         setAnnouncement(item ? `Opened ${item.title}` : "Opened conversation");
-        setIsProfilePanelOpen(false);
+        setIsProfileSidebarOpen(false);
       });
     },
     [activeTenantId, liveSessionReady, queryClient, sidebarItemById],
@@ -677,22 +706,12 @@ function TenantScopedWorkspace() {
     [mutateFavorite],
   );
 
-  if (sessionQuery.isPending && !session) {
-    return (
-      <div className="flex h-full flex-1 items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-4">
-          <div className="flex size-12 items-center justify-center rounded-2xl bg-primary/10">
-            <div className="size-5 animate-spin rounded-full border-2 border-primary/30 border-t-primary" />
-          </div>
-          <p className="text-[13px] font-medium text-muted-foreground/50">
-            Connecting to Teams…
-          </p>
-        </div>
-      </div>
-    );
-  }
+  const accountLoading = !session && sessionQuery.isPending;
+  const conversationsLoading =
+    allSidebarItems.length === 0 &&
+    (!session || conversationsQuery.isPending || conversationsQuery.isFetching);
 
-  if (sessionQuery.isError || !session) {
+  if (!session && sessionQuery.isError) {
     const message =
       sessionQuery.error instanceof Error
         ? sessionQuery.error.message
@@ -732,7 +751,7 @@ function TenantScopedWorkspace() {
           }}
         >
           <Sidebar
-            upn={session.upn}
+            upn={session?.upn}
             selfAvatarSrc={selfAvatarSrc}
             accountAvatarByTenant={accountAvatarByTenant}
             presenceByMri={presenceByMri}
@@ -747,11 +766,15 @@ function TenantScopedWorkspace() {
             onHoverConversationEnd={handleHoverConversationEnd}
             onToggleFavorite={handleToggleFavorite}
             searchInputRef={searchInputRef}
+            accountLoading={accountLoading}
+            conversationsLoading={conversationsLoading}
           />
         </PerfProfiler>
 
         <main className="flex min-h-0 min-w-0 flex-1 flex-col bg-background">
-          {!selectedItem && allSidebarItems.length === 0 ? (
+          {conversationsLoading ? (
+            <MainLoadingSkeleton />
+          ) : !selectedItem && allSidebarItems.length === 0 ? (
             <div className="flex flex-1 flex-col items-center justify-center gap-4">
               <div className="flex size-20 items-center justify-center rounded-3xl bg-accent">
                 <span className="text-4xl text-muted-foreground/20">💬</span>
@@ -798,7 +821,7 @@ function TenantScopedWorkspace() {
                 presenceByMri={presenceByMri}
                 onOpenProfile={
                   selectedProfileData
-                    ? () => setIsProfilePanelOpen(true)
+                    ? () => setIsProfileSidebarOpen(true)
                     : undefined
                 }
                 profileButtonLabel={
@@ -840,7 +863,7 @@ function TenantScopedWorkspace() {
                     selectedItem.conversation.consumptionHorizon
                   }
                   onSearchResultCountChange={setThreadSearchResultCount}
-                  selfSkypeId={session.skypeId}
+                  selfSkypeId={session?.skypeId}
                   avatarByMri={avatarThumbByMri}
                   avatarFullByMri={avatarFullByMri}
                   displayNameByMri={displayNameByMri}
@@ -879,11 +902,11 @@ function TenantScopedWorkspace() {
           )}
         </main>
 
-        {/* Right-side profile panel */}
-        {isProfilePanelOpen && selectedProfileData ? (
-          <ProfilePanel
+        {isProfileSidebarOpen && selectedProfileData ? (
+          <ProfileSidebar
             profile={selectedProfileData}
-            onClose={() => setIsProfilePanelOpen(false)}
+            closeLabel="Close profile sidebar"
+            onClose={() => setIsProfileSidebarOpen(false)}
           />
         ) : null}
       </div>

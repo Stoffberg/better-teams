@@ -1,8 +1,4 @@
-import type {
-  ExtractedToken,
-  PresenceInfo,
-  TeamsAccountOption,
-} from "@/services/teams/types";
+import type { ExtractedToken, PresenceInfo } from "@/services/teams/types";
 
 const PRESENCE_CACHE_TTL_MS = 15_000;
 const cachedPresenceByMri = new Map<
@@ -24,10 +20,6 @@ export async function getAuthToken(
 ): Promise<ExtractedToken | null> {
   const raw = await api().teams.getAuthToken(tenantId ?? null);
   return raw ? hydrateToken(raw) : null;
-}
-
-export async function getAvailableAccounts(): Promise<TeamsAccountOption[]> {
-  return api().teams.getAvailableAccounts();
 }
 
 export async function getCachedPresence(

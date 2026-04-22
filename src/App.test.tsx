@@ -5,7 +5,6 @@ import { ChatWorkspace } from "@/components/chat/ChatWorkspace";
 import { TeamsAccountProvider } from "@/providers/TeamsAccountProvider";
 import { ThemeProvider } from "@/providers/ThemeProvider";
 
-// Mock the teams-client-factory and electron-bridge modules
 vi.mock("@/lib/teams-client-factory", () => ({
   getOrCreateClient: vi.fn().mockResolvedValue({
     initialize: vi.fn().mockResolvedValue(undefined),
@@ -30,7 +29,6 @@ vi.mock("@/lib/teams-client-factory", () => ({
     getMessagesByUrl: vi.fn().mockResolvedValue({ messages: [] }),
     getAnchoredMessages: vi.fn().mockResolvedValue({ messages: [] }),
   }),
-  getOrCreateUninitializedClient: vi.fn(),
   clearClientCache: vi.fn(),
 }));
 

@@ -9,7 +9,7 @@ function normalizePresenceToken(value: string | undefined): string {
   );
 }
 
-export function presenceLabel(presence?: PresenceInfo | null): string {
+function presenceLabel(presence?: PresenceInfo | null): string {
   if (!presence) return "Unknown";
   return presence.availability || presence.activity || "Unknown";
 }

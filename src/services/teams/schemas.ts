@@ -13,8 +13,6 @@ import type {
   AuthzResponse,
   Conversation,
   ConversationsResponse,
-  CsaChat,
-  CsaConversationsResponse,
   MembersConsumptionHorizonsResponse,
   Message,
   MessagesResponse,
@@ -127,7 +125,7 @@ function lastMessageWireWithParentConversationId(
   return o;
 }
 
-export const ConversationMemberSchema = z
+const ConversationMemberSchema = z
   .object({
     id: z.string(),
     role: z.string().optional().default("User"),
@@ -225,7 +223,7 @@ export const MessagesResponseSchema: z.ZodType<MessagesResponse> = z
   })
   .passthrough();
 
-export const PresenceInfoSchema: z.ZodType<PresenceInfo> = z
+const PresenceInfoSchema: z.ZodType<PresenceInfo> = z
   .object({
     availability: z.string().optional(),
     activity: z.string().optional(),
@@ -290,58 +288,6 @@ export const AuthzResponseSchema: z.ZodType<AuthzResponse> = z
       .default({ isFreemium: false, isTrial: false }),
   })
   .passthrough();
-
-const CsaUserSchema = z
-  .object({
-    id: z.string(),
-    displayName: z.string(),
-    email: z.string().optional(),
-    userPrincipalName: z.string().optional(),
-  })
-  .passthrough();
-
-const CsaChannelSchema = z
-  .object({
-    id: z.string(),
-    displayName: z.string().optional(),
-    threadProperties: z.record(z.string(), z.unknown()).optional(),
-  })
-  .passthrough();
-
-const CsaTeamSchema = z
-  .object({
-    id: z.string(),
-    displayName: z.string().optional(),
-    threadProperties: z.record(z.string(), z.unknown()).optional(),
-    channels: z.array(CsaChannelSchema).optional(),
-  })
-  .passthrough();
-
-const CsaChatRowSchema = z
-  .object({
-    id: z.string(),
-    threadProperties: z.record(z.string(), z.unknown()).optional(),
-    members: z.array(ConversationMemberSchema).optional(),
-    lastMessage: z.unknown().optional(),
-  })
-  .passthrough();
-
-const CsaChatSchema: z.ZodType<CsaChat> = CsaChatRowSchema.transform((c) => {
-  const enriched = lastMessageWireWithParentConversationId(c.id, c.lastMessage);
-  const lastMessage =
-    enriched == null ? undefined : MessageSchema.parse(enriched);
-  return { ...c, lastMessage };
-});
-
-export const CsaConversationsResponseSchema: z.ZodType<CsaConversationsResponse> =
-  z
-    .object({
-      chats: z.array(CsaChatSchema).optional(),
-      teams: z.array(CsaTeamSchema).optional(),
-      users: z.record(z.string(), CsaUserSchema).optional(),
-      metadata: z.record(z.string(), z.unknown()).optional(),
-    })
-    .passthrough();
 
 export const ShortProfileRowSchema = z
   .object({

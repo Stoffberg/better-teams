@@ -2,7 +2,6 @@ import {
   createContext,
   type ReactNode,
   useCallback,
-  useContext,
   useLayoutEffect,
   useMemo,
   useState,
@@ -10,7 +9,7 @@ import {
 
 const STORAGE_KEY = "better-teams-theme";
 
-export type ThemePreference = "light" | "dark" | "system";
+type ThemePreference = "light" | "dark" | "system";
 
 type ThemeContextValue = {
   theme: ThemePreference;
@@ -24,9 +23,7 @@ function readStoredTheme(): ThemePreference {
   try {
     const s = localStorage.getItem(STORAGE_KEY);
     if (s === "dark" || s === "light" || s === "system") return s;
-  } catch {
-    /* ignore */
-  }
+  } catch {}
   return "light";
 }
 
@@ -41,9 +38,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const setTheme = useCallback((value: ThemePreference) => {
     try {
       localStorage.setItem(STORAGE_KEY, value);
-    } catch {
-      /* ignore */
-    }
+    } catch {}
     setThemeState(value);
   }, []);
 
@@ -70,12 +65,4 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   return (
     <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
   );
-}
-
-export function useTheme(): ThemeContextValue {
-  const ctx = useContext(ThemeContext);
-  if (!ctx) {
-    throw new Error("useTheme must be used within ThemeProvider");
-  }
-  return ctx;
 }

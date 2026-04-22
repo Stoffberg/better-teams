@@ -54,7 +54,7 @@ function subscribeToDocumentVisibility(onStoreChange: () => void): () => void {
   return () => document.removeEventListener("visibilitychange", onStoreChange);
 }
 
-export function useDocumentVisibility(): boolean {
+function useDocumentVisibility(): boolean {
   return useSyncExternalStore(
     subscribeToDocumentVisibility,
     isDocumentVisible,
@@ -62,7 +62,7 @@ export function useDocumentVisibility(): boolean {
   );
 }
 
-export function useResumeCooldown(delayMs = RESUME_COOLDOWN_MS): boolean {
+function useResumeCooldown(delayMs = RESUME_COOLDOWN_MS): boolean {
   const documentVisible = useDocumentVisibility();
   const [resumeReady, setResumeReady] = useState(documentVisible);
 
@@ -134,6 +134,7 @@ export function useTeamsSession(): {
       } satisfies TeamsSessionInfo;
     },
     initialData: activeSession,
+    initialDataUpdatedAt: activeSession ? 0 : undefined,
     enabled: true,
     staleTime: 30_000,
     gcTime: Number.POSITIVE_INFINITY,

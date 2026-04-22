@@ -1,21 +1,3 @@
-// ── Token & Auth Types ──
-
-export interface TeamsTokenSet {
-  authToken: string;
-  skypeToken: string;
-  chatSvcAggToken?: string;
-  account: TeamsAccount;
-  expiresAt: Date;
-}
-
-export interface TeamsAccount {
-  userId: string;
-  userName: string;
-  displayName: string;
-  tenantId: string;
-  skypeId: string;
-}
-
 export interface TeamsAccountOption {
   upn?: string;
   tenantId?: string;
@@ -23,31 +5,12 @@ export interface TeamsAccountOption {
 
 export type TeamsTenantId = string;
 
-export interface TeamsAccountSelection {
-  selectedTenantId: TeamsTenantId | null;
-  pendingTenantId: TeamsTenantId | null;
-}
-
 export interface TeamsSessionInfo {
   upn?: string;
   tenantId: TeamsTenantId;
   skypeId?: string;
   expiresAt: string | null;
   region: string | null;
-}
-
-export interface TeamsWorkspaceShellTenantSnapshot {
-  updatedAt: number;
-  session: TeamsSessionInfo;
-  conversations: Conversation[];
-}
-
-export interface TeamsWorkspaceShellAccountSnapshot
-  extends TeamsAccountOption {}
-
-export interface TeamsWorkspaceShellSnapshot {
-  accounts: TeamsWorkspaceShellAccountSnapshot[];
-  tenants: Record<string, TeamsWorkspaceShellTenantSnapshot>;
 }
 
 export interface AuthzResponse {
@@ -74,8 +37,6 @@ export interface RegionGtms {
   [key: string]: string;
 }
 
-// ── Token Types ──
-
 export interface ExtractedToken {
   host: string;
   name: string;
@@ -86,8 +47,6 @@ export interface ExtractedToken {
   skypeId?: string;
   expiresAt: Date;
 }
-
-// ── Conversation Types ──
 
 export interface MessageEmotionUser {
   mri: string;
@@ -340,8 +299,6 @@ export type TeamsProfilePresentation = {
   locations: Record<string, string>;
 };
 
-// ── Presence Types ──
-
 export interface PresenceInfo {
   availability?: string;
   activity?: string;
@@ -349,49 +306,4 @@ export interface PresenceInfo {
     message: string;
     expiry: string;
   };
-}
-
-// ── CSA Types (Chat Service Aggregator) ──
-
-export interface CsaConversationsResponse {
-  chats?: CsaChat[];
-  teams?: CsaTeam[];
-  users?: Record<string, CsaUser>;
-  metadata?: {
-    syncToken?: string;
-  };
-}
-
-export interface CsaChat {
-  id: string;
-  threadProperties?: {
-    topic?: string;
-    threadType?: string;
-  };
-  members?: ConversationMember[];
-  lastMessage?: Message;
-}
-
-export interface CsaTeam {
-  id: string;
-  displayName?: string;
-  threadProperties?: {
-    topic?: string;
-  };
-  channels?: CsaChannel[];
-}
-
-export interface CsaChannel {
-  id: string;
-  displayName?: string;
-  threadProperties?: {
-    topic?: string;
-  };
-}
-
-export interface CsaUser {
-  id: string;
-  displayName: string;
-  email?: string;
-  userPrincipalName?: string;
 }

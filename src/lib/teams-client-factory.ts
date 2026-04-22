@@ -97,9 +97,6 @@ function createClient(tenantId?: string): TeamsApiClient {
   });
 }
 
-/**
- * Get an existing client for the tenant or create + initialize a new one.
- */
 export async function getOrCreateClient(
   tenantId?: string,
 ): Promise<TeamsApiClient> {
@@ -124,25 +121,6 @@ export async function getOrCreateClient(
   return initialization;
 }
 
-/**
- * Get a client without initializing it (for cases where you need
- * to call initialize yourself, e.g. to return the session info).
- */
-export function getOrCreateUninitializedClient(
-  tenantId?: string,
-): TeamsApiClient {
-  const key = tenantKey(tenantId);
-  const existing = tenantClients.get(key);
-  if (existing) return existing;
-
-  const client = createClient(tenantId);
-  tenantClients.set(key, client);
-  return client;
-}
-
-/**
- * Clear the client cache (e.g., on logout or account switch).
- */
 export function clearClientCache(): void {
   tenantClients.clear();
   tenantClientInitializations.clear();

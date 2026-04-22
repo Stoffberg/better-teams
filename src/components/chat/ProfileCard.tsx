@@ -1,7 +1,6 @@
 import {
   Briefcase,
   Building2,
-  ChevronRight,
   Hash,
   Mail,
   MapPin,
@@ -10,7 +9,13 @@ import {
   Video,
   X,
 } from "lucide-react";
-import { useState } from "react";
+import {
+  type ComponentType,
+  type KeyboardEventHandler,
+  type MouseEventHandler,
+  type ReactNode,
+  useState,
+} from "react";
 import { createPortal } from "react-dom";
 import { initialsFromLabel } from "@/lib/chat-format";
 import { presenceDescription } from "@/lib/teams-presence";
@@ -139,7 +144,7 @@ function ProfileInfoRow({
   isLink,
   href,
 }: {
-  icon: React.ComponentType<{ className?: string }>;
+  icon: ComponentType<{ className?: string }>;
   label: string;
   isLink?: boolean;
   href?: string;
@@ -175,7 +180,7 @@ function ProfileFact({
   label,
   value,
 }: {
-  icon: React.ComponentType<{ className?: string }>;
+  icon: ComponentType<{ className?: string }>;
   label: string;
   value: string;
 }) {
@@ -242,16 +247,9 @@ function SharedConversationList({ profile }: { profile: ProfileData }) {
   );
 }
 
-/** Right-side profile panel (Slack-like) */
-export function ProfilePanel({
-  profile,
-  onClose,
-}: {
-  profile: ProfileData;
-  onClose: () => void;
-}) {
+function profileFacts(profile: ProfileData) {
   const orgName = profileOrgName(profile);
-  const facts = [
+  return [
     orgName ? { icon: Building2, label: "Organization", value: orgName } : null,
     profile.department
       ? { icon: Shapes, label: "Department", value: profile.department }
@@ -260,37 +258,64 @@ export function ProfilePanel({
       ? { icon: MapPin, label: "Location", value: profile.location }
       : null,
   ].filter(Boolean) as Array<{
-    icon: React.ComponentType<{ className?: string }>;
+    icon: ComponentType<{ className?: string }>;
     label: string;
     value: string;
   }>;
+}
+
+export function ProfileSidebar({
+  profile,
+  onClose,
+  closeLabel = "Close profile",
+  className,
+  role,
+  onClick,
+  onKeyDown,
+}: {
+  profile: ProfileData;
+  onClose: () => void;
+  closeLabel?: string;
+  className?: string;
+  role?: "document";
+  onClick?: MouseEventHandler<HTMLElement>;
+  onKeyDown?: KeyboardEventHandler<HTMLElement>;
+}) {
+  const orgName = profileOrgName(profile);
+  const facts = profileFacts(profile);
 
   return (
-    <aside className="flex w-80 shrink-0 flex-col overflow-hidden border-l border-border bg-background">
-      {/* Panel header */}
+    <aside
+      role={role}
+      onClick={onClick}
+      onKeyDown={onKeyDown}
+      className={cn(
+        "flex w-80 shrink-0 flex-col overflow-hidden border-l border-border bg-background",
+        className,
+      )}
+    >
       <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+        <h3 className="min-w-0 flex-1 truncate text-[15px] font-bold">
+          {profile.displayName}&apos;s profile
+        </h3>
         <button
           type="button"
           onClick={onClose}
           className="flex size-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
-          aria-label="Close profile sidebar"
+          aria-label={closeLabel}
         >
-          <ChevronRight className="size-4" />
+          <X className="size-4" />
         </button>
-        <h3 className="min-w-0 flex-1 truncate text-[15px] font-bold">
-          {profile.displayName}&apos;s profile
-        </h3>
       </div>
 
-      {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto">
-        {/* Avatar + name */}
         <div className="flex flex-col items-center gap-3 px-6 pt-8 pb-6">
           <div className="rounded-full ring-4 ring-background">
             <ProfileAvatar
               src={profile.avatarFullSrc ?? profile.avatarThumbSrc}
               name={profile.displayName}
               size="xl"
+              presence={profile.presence}
             />
           </div>
           <div className="space-y-0.5 text-center">
@@ -302,6 +327,11 @@ export function ProfilePanel({
                 {profile.jobTitle}
               </p>
             ) : null}
+            {profile.presence ? (
+              <p className="text-[13px] text-muted-foreground">
+                {presenceDescription(profile.presence)}
+              </p>
+            ) : null}
             {orgName ? (
               <p className="text-[13px] font-medium text-muted-foreground/90">
                 {orgName}
@@ -310,7 +340,6 @@ export function ProfilePanel({
           </div>
         </div>
 
-        {/* Divider */}
         <div className="mx-6 border-t border-border" />
 
         {facts.length > 0 ? (
@@ -328,7 +357,6 @@ export function ProfilePanel({
 
         <SharedConversationList profile={profile} />
 
-        {/* Contact info rows */}
         <div className="space-y-0 px-6 pt-5 pb-6">
           {profile.email ? (
             <ProfileInfoRow
@@ -361,164 +389,12 @@ export function ProfilePanel({
   );
 }
 
-function ProfileDrawer({
-  profile,
-  open,
-  onClose,
-}: {
-  profile: ProfileData;
-  open: boolean;
-  onClose: () => void;
-}) {
-  if (!open) return null;
-  const orgName = profileOrgName(profile);
-  const facts = [
-    orgName ? { icon: Building2, label: "Organization", value: orgName } : null,
-    profile.department
-      ? { icon: Shapes, label: "Department", value: profile.department }
-      : null,
-    profile.location
-      ? { icon: MapPin, label: "Location", value: profile.location }
-      : null,
-  ].filter(Boolean) as Array<{
-    icon: React.ComponentType<{ className?: string }>;
-    label: string;
-    value: string;
-  }>;
-
-  const drawer = (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={`Profile: ${profile.displayName}`}
-      className="fixed inset-0 z-50 flex justify-end"
-      onClick={onClose}
-      onKeyDown={(e) => {
-        if (e.key === "Escape") onClose();
-      }}
-    >
-      {/* Overlay */}
-      <div
-        className="fixed inset-0 bg-foreground/10 backdrop-blur-[3px] animate-in fade-in-0 duration-200"
-        aria-hidden="true"
-      />
-
-      {/* Drawer panel – slides in from right */}
-      <aside
-        role="document"
-        className="relative z-10 flex h-full w-full max-w-sm flex-col overflow-hidden border-l border-border bg-background shadow-xl animate-in slide-in-from-right duration-200"
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center gap-2 border-b border-border px-4 py-3">
-          <h3 className="min-w-0 flex-1 truncate text-[15px] font-bold">
-            Profile
-          </h3>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close profile"
-            className="flex size-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
-          >
-            <X className="size-4" />
-          </button>
-        </div>
-
-        {/* Scrollable content */}
-        <div className="flex-1 overflow-y-auto">
-          {/* Avatar + name */}
-          <div className="flex flex-col items-center gap-3 px-6 pt-8 pb-6">
-            <div className="rounded-full ring-4 ring-background">
-              <ProfileAvatar
-                src={profile.avatarFullSrc ?? profile.avatarThumbSrc}
-                name={profile.displayName}
-                size="xl"
-                presence={profile.presence}
-              />
-            </div>
-            <div className="space-y-0.5 text-center">
-              <h4 className="text-[20px] font-bold leading-snug tracking-[-0.01em]">
-                {profile.displayName}
-              </h4>
-              {profile.jobTitle ? (
-                <p className="text-[14px] text-muted-foreground">
-                  {profile.jobTitle}
-                </p>
-              ) : null}
-              {profile.presence ? (
-                <p className="text-[13px] text-muted-foreground">
-                  {presenceDescription(profile.presence)}
-                </p>
-              ) : null}
-              {orgName ? (
-                <p className="text-[13px] font-medium text-muted-foreground/90">
-                  {orgName}
-                </p>
-              ) : null}
-            </div>
-          </div>
-
-          {/* Divider */}
-          <div className="mx-6 border-t border-border" />
-
-          {facts.length > 0 ? (
-            <div className="grid gap-2 px-6 pt-5">
-              {facts.map((fact) => (
-                <ProfileFact
-                  key={fact.label}
-                  icon={fact.icon}
-                  label={fact.label}
-                  value={fact.value}
-                />
-              ))}
-            </div>
-          ) : null}
-
-          <SharedConversationList profile={profile} />
-
-          {/* Contact info rows */}
-          <div className="space-y-0 px-6 pt-5 pb-6">
-            {profile.email ? (
-              <ProfileInfoRow
-                icon={Mail}
-                label={profile.email}
-                isLink
-                href={`mailto:${profile.email}`}
-              />
-            ) : null}
-
-            {profile.jobTitle ? (
-              <ProfileInfoRow icon={Briefcase} label={profile.jobTitle} />
-            ) : null}
-          </div>
-        </div>
-
-        {profile.onMessage ? (
-          <div className="flex shrink-0 gap-2 border-t border-border px-4 py-3">
-            <button
-              type="button"
-              onClick={profile.onMessage}
-              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-[13px] font-medium text-foreground transition-colors hover:bg-accent"
-            >
-              <MessageSquare className="size-4" />
-              Message
-            </button>
-          </div>
-        ) : null}
-      </aside>
-    </div>
-  );
-
-  return createPortal(drawer, document.body);
-}
-
 export function ProfileTrigger({
   profile,
   children,
 }: {
   profile: ProfileData | null;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   const [showCard, setShowCard] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -584,11 +460,35 @@ export function ProfileTrigger({
           </span>
         ) : null}
       </button>
-      <ProfileDrawer
-        profile={profile}
-        open={showModal}
-        onClose={() => setShowModal(false)}
-      />
+      {showModal
+        ? createPortal(
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label={`Profile: ${profile.displayName}`}
+              className="fixed inset-0 z-50 flex justify-end"
+              onClick={() => setShowModal(false)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") setShowModal(false);
+              }}
+            >
+              <div
+                className="fixed inset-0 bg-foreground/10 backdrop-blur-[3px] animate-in fade-in-0 duration-200"
+                aria-hidden="true"
+              />
+              <ProfileSidebar
+                profile={profile}
+                onClose={() => setShowModal(false)}
+                closeLabel="Close profile"
+                role="document"
+                className="relative z-10 h-full w-full max-w-sm shadow-xl animate-in slide-in-from-right duration-200"
+                onClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => e.stopPropagation()}
+              />
+            </div>,
+            document.body,
+          )
+        : null}
     </>
   );
 }

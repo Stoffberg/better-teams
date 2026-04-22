@@ -4,16 +4,16 @@ export const PERF_FLAG = "better-teams-perf";
 
 type PerfDetailValue = boolean | number | string | null;
 
-export type PerfDetail = Record<string, PerfDetailValue>;
+type PerfDetail = Record<string, PerfDetailValue>;
 
-export type PerfMetric = {
+type PerfMetric = {
   name: string;
   at: number;
   durationMs?: number;
   detail?: PerfDetail;
 };
 
-export type PerfSnapshot = {
+type PerfSnapshot = {
   name: string;
   at: number;
   values: PerfDetail;

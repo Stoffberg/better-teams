@@ -1,9 +1,8 @@
 import { MakerDMG } from "@electron-forge/maker-dmg";
 import { MakerZIP } from "@electron-forge/maker-zip";
 import { VitePlugin } from "@electron-forge/plugin-vite";
-import type { ForgeConfig } from "@electron-forge/shared-types";
 
-const config: ForgeConfig = {
+const config = {
   packagerConfig: {
     asar: true,
     appBundleId: "com.betterteams.app",

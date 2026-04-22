@@ -4,6 +4,7 @@ import {
   type ReactNode,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
 } from "react";
@@ -19,8 +20,10 @@ import type {
 } from "@/services/teams/types";
 
 const PREFERRED_TENANT_STORAGE_KEY = "better-teams-preferred-tenant-id";
+const CACHED_ACCOUNTS_STORAGE_KEY = "better-teams-cached-accounts";
+const CACHED_SESSION_STORAGE_KEY = "better-teams-cached-session";
 
-export type TeamsAccountContextValue = {
+type TeamsAccountContextValue = {
   accounts: TeamsAccountOption[];
   activeTenantId?: string;
   selectedTenantId?: string | null;
@@ -50,9 +53,11 @@ function writePreferredTenantId(tenantId: string | null): void {
       return;
     }
     localStorage.removeItem(PREFERRED_TENANT_STORAGE_KEY);
-  } catch {
-    // Ignore storage failures in restricted environments.
-  }
+  } catch {}
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function normalizeAccounts(
@@ -61,6 +66,69 @@ function normalizeAccounts(
   return [...(accounts ?? [])].sort((a, b) =>
     (a.upn ?? "").localeCompare(b.upn ?? ""),
   );
+}
+
+function readCachedAccounts(): TeamsAccountOption[] | undefined {
+  try {
+    const raw = localStorage.getItem(CACHED_ACCOUNTS_STORAGE_KEY);
+    if (!raw) return undefined;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return undefined;
+    return normalizeAccounts(
+      parsed.filter(isRecord).flatMap((account) => {
+        const upn = typeof account.upn === "string" ? account.upn : undefined;
+        const tenantId =
+          typeof account.tenantId === "string" ? account.tenantId : undefined;
+        return upn || tenantId ? [{ upn, tenantId }] : [];
+      }),
+    );
+  } catch {
+    return undefined;
+  }
+}
+
+function writeCachedAccounts(accounts: TeamsAccountOption[]): void {
+  if (accounts.length === 0) return;
+  try {
+    localStorage.setItem(CACHED_ACCOUNTS_STORAGE_KEY, JSON.stringify(accounts));
+  } catch {}
+}
+
+function readCachedSession(): TeamsSessionInfo | undefined {
+  try {
+    const raw = localStorage.getItem(CACHED_SESSION_STORAGE_KEY);
+    if (!raw) return undefined;
+    const parsed = JSON.parse(raw);
+    if (!isRecord(parsed)) return undefined;
+    const tenantId = parsed.tenantId;
+    if (typeof tenantId !== "string") return undefined;
+    return {
+      upn: typeof parsed.upn === "string" ? parsed.upn : undefined,
+      tenantId,
+      skypeId: typeof parsed.skypeId === "string" ? parsed.skypeId : undefined,
+      expiresAt:
+        typeof parsed.expiresAt === "string" || parsed.expiresAt === null
+          ? parsed.expiresAt
+          : null,
+      region: typeof parsed.region === "string" ? parsed.region : null,
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+function writeCachedSession(session: TeamsSessionInfo | undefined): void {
+  if (!session) return;
+  try {
+    localStorage.setItem(CACHED_SESSION_STORAGE_KEY, JSON.stringify(session));
+  } catch {}
+}
+
+function sessionTenantForSelection(
+  session: TeamsSessionInfo | undefined,
+): string | null {
+  if (!session || session.tenantId === "__default__") return null;
+  return session.tenantId;
 }
 
 function resolveSelectedTenantId(
@@ -93,6 +161,8 @@ async function initializeTeamsSession(
 export function TeamsAccountProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
 
+  const [initialAccounts] = useState(() => readCachedAccounts());
+  const [cachedSession, setCachedSession] = useState(() => readCachedSession());
   const [persistedPreference, setPersistedPreference] = useState<string | null>(
     () => readPreferredTenantId(),
   );
@@ -102,6 +172,8 @@ export function TeamsAccountProvider({ children }: { children: ReactNode }) {
     queryKey: teamsKeys.accounts(),
     queryFn: async () =>
       normalizeAccounts((await TeamsApiClient.getAvailableAccounts()) ?? []),
+    initialData: initialAccounts,
+    initialDataUpdatedAt: initialAccounts ? 0 : undefined,
     staleTime: 30_000,
     gcTime: Number.POSITIVE_INFINITY,
   });
@@ -113,16 +185,32 @@ export function TeamsAccountProvider({ children }: { children: ReactNode }) {
 
   const selectedTenantId = resolveSelectedTenantId(
     accounts,
-    persistedPreference,
+    persistedPreference ?? sessionTenantForSelection(cachedSession),
   );
+  const cachedSessionForSelection =
+    sessionTenantForSelection(cachedSession) === (selectedTenantId ?? null)
+      ? cachedSession
+      : undefined;
 
   const sessionQuery = useQuery({
     queryKey: teamsKeys.session(selectedTenantId),
     queryFn: async () => initializeTeamsSession(selectedTenantId),
+    initialData: cachedSessionForSelection,
+    initialDataUpdatedAt: cachedSessionForSelection ? 0 : undefined,
     enabled: true,
     staleTime: 30_000,
     gcTime: Number.POSITIVE_INFINITY,
   });
+
+  useEffect(() => {
+    writeCachedAccounts(accounts);
+  }, [accounts]);
+
+  useEffect(() => {
+    if (!sessionQuery.data) return;
+    writeCachedSession(sessionQuery.data);
+    setCachedSession(sessionQuery.data);
+  }, [sessionQuery.data]);
 
   const switchAccount = useCallback(
     (tenantId: string | null) => {
@@ -155,7 +243,10 @@ export function TeamsAccountProvider({ children }: { children: ReactNode }) {
     [persistedPreference, queryClient, selectedTenantId],
   );
 
-  const activeTenantId = selectedTenantId ?? sessionQuery.data?.tenantId;
+  const activeTenantId =
+    selectedTenantId ??
+    sessionTenantForSelection(sessionQuery.data) ??
+    undefined;
 
   const value = useMemo<TeamsAccountContextValue>(
     () => ({

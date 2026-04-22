@@ -1,6 +1,10 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { type ProfileData, ProfilePanel, ProfileTrigger } from "./ProfileCard";
+import {
+  type ProfileData,
+  ProfileSidebar,
+  ProfileTrigger,
+} from "./ProfileCard";
 
 function makeProfile(overrides: Partial<ProfileData> = {}): ProfileData {
   return {
@@ -11,12 +15,12 @@ function makeProfile(overrides: Partial<ProfileData> = {}): ProfileData {
   };
 }
 
-describe("ProfilePanel", () => {
+describe("ProfileSidebar", () => {
   it("uses the message action and removes the dead more controls", () => {
     const onMessage = vi.fn();
 
     render(
-      <ProfilePanel
+      <ProfileSidebar
         profile={makeProfile({ onMessage })}
         onClose={() => undefined}
       />,
@@ -35,7 +39,7 @@ describe("ProfilePanel", () => {
 
   it("hides the message action when no alternate chat is available", () => {
     render(
-      <ProfilePanel
+      <ProfileSidebar
         profile={makeProfile({ onMessage: undefined })}
         onClose={() => undefined}
       />,
@@ -48,7 +52,7 @@ describe("ProfilePanel", () => {
 
   it("does not show a misleading shared chat count when the list is truncated", () => {
     render(
-      <ProfilePanel
+      <ProfileSidebar
         profile={makeProfile({
           sharedConversations: Array.from({ length: 8 }, (_, index) => ({
             id: `c${index + 2}`,

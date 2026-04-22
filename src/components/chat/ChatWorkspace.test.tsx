@@ -114,14 +114,18 @@ describe("ChatWorkspace", () => {
     resetPerfStore();
   });
 
-  it("shows connecting while session loads", async () => {
+  it("keeps the workspace shell visible while session loads", async () => {
     let resolveClient!: (v: unknown) => void;
     const clientPromise = new Promise((r) => {
       resolveClient = r;
     });
     vi.mocked(getOrCreateClient).mockReturnValue(clientPromise as never);
     renderChat();
-    expect(screen.getByText(/connecting/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole("searchbox", { name: /search chats/i }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/connecting/i)).not.toBeInTheDocument();
+    expect(document.querySelector('[data-slot="skeleton"]')).toBeTruthy();
     resolveClient(
       makeMockClient({
         account: {
@@ -136,6 +140,38 @@ describe("ChatWorkspace", () => {
     expect(
       await screen.findByRole("button", { name: /switch account/i }),
     ).toBeInTheDocument();
+  });
+
+  it("uses cached account data while refreshing the Teams session", async () => {
+    localStorage.setItem(
+      "better-teams-cached-accounts",
+      JSON.stringify([{ upn: "cached@test.com", tenantId: "t1" }]),
+    );
+    localStorage.setItem(
+      "better-teams-cached-session",
+      JSON.stringify({
+        upn: "cached@test.com",
+        tenantId: "t1",
+        skypeId: "self",
+        expiresAt: "2026-01-01T00:00:00.000Z",
+        region: "amer",
+      }),
+    );
+    let resolveClient!: (v: unknown) => void;
+    const clientPromise = new Promise((r) => {
+      resolveClient = r;
+    });
+    vi.mocked(getOrCreateClient).mockReturnValue(clientPromise as never);
+
+    renderChat();
+
+    expect(
+      screen.getByRole("button", { name: /switch account/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("cached@test.com")).toBeInTheDocument();
+    expect(screen.queryByText(/connecting/i)).not.toBeInTheDocument();
+
+    resolveClient(makeMockClient());
   });
 
   it("shows error and retry when initialize fails", async () => {
@@ -160,7 +196,9 @@ describe("ChatWorkspace", () => {
     await waitFor(() => {
       expect(screen.queryByText(/keychain blocked/i)).not.toBeInTheDocument();
     });
-    expect(screen.getByText(/no conversations yet/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/no conversations yet/i),
+    ).toBeInTheDocument();
   });
 
   it("lists Teams group chat in the flat sidebar without rendering a thread header", async () => {
@@ -789,7 +827,8 @@ describe("ChatWorkspace", () => {
     );
 
     expect(screen.queryByText("Alpha account chat")).not.toBeInTheDocument();
-    expect(await screen.findByText(/connecting/i)).toBeInTheDocument();
+    expect(screen.queryByText(/connecting/i)).not.toBeInTheDocument();
+    expect(document.querySelector('[data-slot="skeleton"]')).toBeTruthy();
 
     resolveClientB(mockClientB);
 

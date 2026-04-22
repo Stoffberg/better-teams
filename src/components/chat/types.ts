@@ -6,9 +6,6 @@ import type {
 } from "@/lib/chat-format";
 import type { Conversation, Message } from "@/services/teams/types";
 
-export type SidebarSectionId = "meetings" | "groups" | "direct";
-export type SidebarSectionState = Record<SidebarSectionId, boolean>;
-
 export type SidebarConversationItem = {
   id: string;
   conversation: Conversation;
@@ -64,13 +61,5 @@ export type MessageBlock =
       key: string;
     };
 
-export const DEFAULT_SECTIONS: SidebarSectionState = {
-  meetings: true,
-  groups: true,
-  direct: true,
-};
-
-export const SIDEBAR_SECTIONS_STORAGE_KEY =
-  "better-teams-chat-sidebar-sections";
 export const THREAD_PAGE = 80;
 export const OLDER_LOAD_THROTTLE_MS = 75;
