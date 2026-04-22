@@ -1,5 +1,6 @@
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { Worker } from "node:worker_threads";
 import {
   app,
   BrowserWindow,
@@ -26,11 +27,10 @@ import {
   getCachedImageFile,
   hasCachedImageFile,
 } from "./image-cache";
-import {
-  extractTokens,
-  getAuthToken,
-  getAvailableAccounts,
-  getCachedPresence,
+import type {
+  AccountOption,
+  CachedPresenceEntry,
+  ExtractedToken,
 } from "./token-store";
 
 if (started) {
@@ -60,6 +60,16 @@ if (process.platform === "darwin") {
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let isQuitting = false;
+
+type TokenWorkerRequest =
+  | { operation: "extractTokens" }
+  | { operation: "getAuthToken"; tenantId?: string | null }
+  | { operation: "getAvailableAccounts" }
+  | { operation: "getCachedPresence"; userMris: string[] };
+
+type TokenWorkerResponse =
+  | { ok: true; value: unknown }
+  | { ok: false; error: string };
 
 const singleInstanceLock = app.requestSingleInstanceLock();
 if (!singleInstanceLock) {
@@ -190,13 +200,23 @@ function showMainWindow(): void {
 }
 
 function registerIpc(): void {
-  ipcMain.handle("teams:extractTokens", () => extractTokens());
-  ipcMain.handle("teams:getAuthToken", (_event, tenantId) =>
-    getAuthToken(TenantIdSchema.parse(tenantId)),
+  ipcMain.handle("teams:extractTokens", () =>
+    runTokenWorker<ExtractedToken[]>({ operation: "extractTokens" }),
   );
-  ipcMain.handle("teams:getAvailableAccounts", () => getAvailableAccounts());
+  ipcMain.handle("teams:getAuthToken", (_event, tenantId) =>
+    runTokenWorker<ExtractedToken | null>({
+      operation: "getAuthToken",
+      tenantId: TenantIdSchema.parse(tenantId),
+    }),
+  );
+  ipcMain.handle("teams:getAvailableAccounts", () =>
+    runTokenWorker<AccountOption[]>({ operation: "getAvailableAccounts" }),
+  );
   ipcMain.handle("teams:getCachedPresence", (_event, userMris) =>
-    getCachedPresence(PresenceRequestSchema.parse(userMris)),
+    runTokenWorker<CachedPresenceEntry[]>({
+      operation: "getCachedPresence",
+      userMris: PresenceRequestSchema.parse(userMris),
+    }),
   );
   ipcMain.handle("images:cacheFile", (_event, cacheKey, bytes, extension) => {
     const request = ImageCacheIpcRequestSchema.parse({
@@ -226,6 +246,44 @@ function registerIpc(): void {
 
 function resourcePath(relativePath: string): string {
   return path.join(app.getAppPath(), relativePath);
+}
+
+function runTokenWorker<T>(request: TokenWorkerRequest): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(path.join(__dirname, "token-worker.js"), {
+      workerData: request,
+    });
+    let settled = false;
+    const timeout = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      void worker.terminate();
+      reject(new Error("Timed out reading Teams token store"));
+    }, 10_000);
+    const finish = (callback: () => void) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      callback();
+    };
+
+    worker.once("message", (message: TokenWorkerResponse) => {
+      finish(() => {
+        if (message.ok) {
+          resolve(message.value as T);
+          return;
+        }
+        reject(new Error(message.error));
+      });
+    });
+    worker.once("error", (error) => {
+      finish(() => reject(error));
+    });
+    worker.once("exit", (code) => {
+      if (code === 0) return;
+      finish(() => reject(new Error(`Teams token worker exited with ${code}`)));
+    });
+  });
 }
 
 function filePathFromAssetUrl(assetUrl: string): string {

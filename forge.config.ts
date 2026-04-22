@@ -50,6 +50,11 @@ const config = {
           config: "packages/desktop-electron/vite.preload.config.mts",
           target: "preload",
         },
+        {
+          entry: "packages/desktop-electron/src/main/token-worker.ts",
+          config: "packages/desktop-electron/vite.main.config.mts",
+          target: "main",
+        },
       ],
       renderer: [
         {

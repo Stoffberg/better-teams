@@ -1,7 +1,7 @@
 {
   "name": "better-teams",
   "productName": "Better Teams",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "A calmer, faster Microsoft Teams desktop experience with a focused custom UI",
   "private": true,
   "scripts": {

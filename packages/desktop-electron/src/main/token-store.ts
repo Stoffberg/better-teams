@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import Database from "better-sqlite3";
 
-type ExtractedToken = {
+export type ExtractedToken = {
   host: string;
   name: string;
   token: string;
@@ -16,12 +16,12 @@ type ExtractedToken = {
   expiresAt: string;
 };
 
-type AccountOption = {
+export type AccountOption = {
   upn?: string;
   tenantId?: string;
 };
 
-type CachedPresenceEntry = {
+export type CachedPresenceEntry = {
   mri: string;
   presence: {
     availability?: string;
