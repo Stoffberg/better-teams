@@ -4,14 +4,19 @@ import {
   AccountOptionSchema,
   type BetterTeamsDesktopApi,
   type BetterTeamsFetchRequest,
+  CachedConversationSchema,
+  CachedMessagesResponseSchema,
+  CachedProfilePresentationSchema,
   FetchRequestSchema,
   FetchResponseSchema,
   ImageCachePathSchema,
   ImageCacheRequestSchema,
   PresenceEntrySchema,
   PresenceRequestSchema,
+  ProfilePresentationRequestSchema,
   RawTokenSchema,
   ShellOpenExternalUrlSchema,
+  TeamsSessionInfoSchema,
   TenantIdSchema,
 } from "./contracts";
 
@@ -31,11 +36,44 @@ contextBridge.exposeInMainWorld("betterTeams", {
       AccountOptionSchema.array().parse(
         await invoke("teams:getAvailableAccounts"),
       ),
+    getCachedAccounts: async () =>
+      AccountOptionSchema.array().parse(
+        await invoke("teams:getCachedAccounts"),
+      ),
+    getCachedSession: async (tenantId: string | null) =>
+      TeamsSessionInfoSchema.nullable().parse(
+        await invoke("teams:getCachedSession", TenantIdSchema.parse(tenantId)),
+      ),
     getCachedPresence: async (userMris: string[]) =>
       PresenceEntrySchema.array().parse(
         await invoke(
           "teams:getCachedPresence",
           PresenceRequestSchema.parse(userMris),
+        ),
+      ),
+    getCachedProfilePresentation: async (mris: string[]) =>
+      CachedProfilePresentationSchema.parse(
+        await invoke(
+          "teams:getCachedProfilePresentation",
+          ProfilePresentationRequestSchema.parse(mris),
+        ),
+      ),
+    getCachedConversations: async (tenantId: string | null) =>
+      CachedConversationSchema.array().parse(
+        await invoke(
+          "teams:getCachedConversations",
+          TenantIdSchema.parse(tenantId),
+        ),
+      ),
+    getCachedMessages: async (
+      tenantId: string | null,
+      conversationId: string,
+    ) =>
+      CachedMessagesResponseSchema.nullable().parse(
+        await invoke(
+          "teams:getCachedMessages",
+          TenantIdSchema.parse(tenantId),
+          z.string().parse(conversationId),
         ),
       ),
   },

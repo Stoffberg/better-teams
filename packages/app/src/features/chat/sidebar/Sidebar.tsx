@@ -45,6 +45,7 @@ function workspaceLabelFromUpn(upn?: string): string {
   const domain = email.split("@")[1] ?? "";
   const root = domain.split(".")[0] ?? "";
   if (!root) return "Workspace";
+  if (root === "clouddirect") return "Cloud Direct";
   return root
     .split(/[-_]+/)
     .filter(Boolean)

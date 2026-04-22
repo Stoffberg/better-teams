@@ -26,9 +26,41 @@ export const AccountOptionSchema = z.object({
   tenantId: z.string().optional(),
 });
 
+export const TeamsSessionInfoSchema = z.object({
+  upn: z.string().optional(),
+  tenantId: z.string(),
+  skypeId: z.string().optional(),
+  expiresAt: z.string().nullable(),
+  region: z.string().nullable(),
+});
+
 export const TenantIdSchema = z.string().nullable();
 
 export const PresenceRequestSchema = z.array(z.string());
+
+export const ProfilePresentationRequestSchema = z.array(z.string());
+
+export const CachedConversationSchema = z
+  .object({ id: z.string() })
+  .passthrough();
+
+export const CachedProfilePresentationSchema = z.object({
+  avatarThumbs: z.record(z.string(), z.string()),
+  avatarFull: z.record(z.string(), z.string()),
+  displayNames: z.record(z.string(), z.string()),
+  emails: z.record(z.string(), z.string()),
+  jobTitles: z.record(z.string(), z.string()),
+  departments: z.record(z.string(), z.string()),
+  companyNames: z.record(z.string(), z.string()),
+  tenantNames: z.record(z.string(), z.string()),
+  locations: z.record(z.string(), z.string()),
+});
+
+export const CachedMessagesResponseSchema = z
+  .object({
+    messages: z.array(z.object({ id: z.string() }).passthrough()).optional(),
+  })
+  .passthrough();
 
 export const ImageCacheRequestSchema = z.object({
   cacheKey: z.string(),
@@ -67,6 +99,16 @@ export type BetterTeamsRawToken = z.infer<typeof RawTokenSchema>;
 export type BetterTeamsPresenceInfo = z.infer<typeof PresenceInfoSchema>;
 export type BetterTeamsPresenceEntry = z.infer<typeof PresenceEntrySchema>;
 export type BetterTeamsAccountOption = z.infer<typeof AccountOptionSchema>;
+export type BetterTeamsSessionInfo = z.infer<typeof TeamsSessionInfoSchema>;
+export type BetterTeamsCachedConversation = z.infer<
+  typeof CachedConversationSchema
+>;
+export type BetterTeamsCachedProfilePresentation = z.infer<
+  typeof CachedProfilePresentationSchema
+>;
+export type BetterTeamsCachedMessagesResponse = z.infer<
+  typeof CachedMessagesResponseSchema
+>;
 export type BetterTeamsImageCacheRequest = z.infer<
   typeof ImageCacheRequestSchema
 >;
@@ -78,7 +120,21 @@ export interface BetterTeamsDesktopApi {
     extractTokens(): Promise<BetterTeamsRawToken[]>;
     getAuthToken(tenantId: string | null): Promise<BetterTeamsRawToken | null>;
     getAvailableAccounts(): Promise<BetterTeamsAccountOption[]>;
+    getCachedAccounts(): Promise<BetterTeamsAccountOption[]>;
+    getCachedSession(
+      tenantId: string | null,
+    ): Promise<BetterTeamsSessionInfo | null>;
     getCachedPresence(userMris: string[]): Promise<BetterTeamsPresenceEntry[]>;
+    getCachedProfilePresentation(
+      mris: string[],
+    ): Promise<BetterTeamsCachedProfilePresentation>;
+    getCachedConversations(
+      tenantId: string | null,
+    ): Promise<BetterTeamsCachedConversation[]>;
+    getCachedMessages(
+      tenantId: string | null,
+      conversationId: string,
+    ): Promise<BetterTeamsCachedMessagesResponse | null>;
   };
   images: {
     cacheImageFile(

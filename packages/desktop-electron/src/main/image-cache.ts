@@ -32,6 +32,10 @@ export function hasCachedImageFile(filePath: string): boolean {
   return isWithinDir(candidate, imageCacheDir()) && isFile(candidate);
 }
 
+export function cachedImagePathFromFileName(fileName: string): string {
+  return path.join(imageCacheDir(), path.basename(fileName));
+}
+
 function imageCacheDir(): string {
   const dir =
     process.platform === "darwin"

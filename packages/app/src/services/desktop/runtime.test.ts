@@ -13,7 +13,12 @@ describe("electron-bridge", () => {
         extractTokens: vi.fn(),
         getAuthToken: vi.fn(),
         getAvailableAccounts: vi.fn(),
+        getCachedAccounts: vi.fn(),
+        getCachedSession: vi.fn(),
         getCachedPresence: invokeMock,
+        getCachedProfilePresentation: vi.fn(),
+        getCachedConversations: vi.fn(),
+        getCachedMessages: vi.fn(),
       },
       images: {
         cacheImageFile: vi.fn(),

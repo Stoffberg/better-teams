@@ -3,8 +3,12 @@ import {
   type TeamsRuntime,
 } from "@better-teams/core/runtime";
 import type {
+  Conversation,
   ExtractedToken,
+  MessagesResponse,
   PresenceInfo,
+  TeamsProfilePresentation,
+  TeamsSessionInfo,
 } from "@better-teams/core/teams/types";
 import type { BetterTeamsDesktopApi } from "@better-teams/desktop-electron/preload";
 import { fetch as desktopFetch } from "./fetch";
@@ -33,7 +37,11 @@ export async function getAuthToken(
 
 export async function getAvailableAccounts() {
   const accounts = await api().teams.getAvailableAccounts();
-  if (accounts.length > 0) return accounts;
+  if (Array.isArray(accounts) && accounts.length > 0) return accounts;
+  const cachedAccounts = await getCachedAccounts();
+  if (Array.isArray(cachedAccounts) && cachedAccounts.length > 0) {
+    return cachedAccounts;
+  }
   const tokens = await extractTokens();
   const byTenant = new Map<string, { upn?: string; tenantId?: string }>();
   for (const token of tokens) {
@@ -45,6 +53,19 @@ export async function getAvailableAccounts() {
     });
   }
   return [...byTenant.values()];
+}
+
+export async function getCachedAccounts() {
+  const accounts = await api().teams.getCachedAccounts();
+  return Array.isArray(accounts) ? accounts : [];
+}
+
+export async function getCachedSession(
+  tenantId?: string | null,
+): Promise<TeamsSessionInfo | null> {
+  return api().teams.getCachedSession(
+    tenantId ?? null,
+  ) as Promise<TeamsSessionInfo | null>;
 }
 
 export async function getCachedPresence(
@@ -98,6 +119,32 @@ export async function getCachedPresence(
   }
 
   return { ...cached, ...(await request) };
+}
+
+export async function getCachedConversations(
+  tenantId?: string | null,
+): Promise<Conversation[]> {
+  return api().teams.getCachedConversations(tenantId ?? null) as Promise<
+    Conversation[]
+  >;
+}
+
+export async function getCachedMessages(
+  tenantId: string | null | undefined,
+  conversationId: string,
+): Promise<MessagesResponse | null> {
+  return api().teams.getCachedMessages(
+    tenantId ?? null,
+    conversationId,
+  ) as Promise<MessagesResponse | null>;
+}
+
+export async function getCachedProfilePresentation(
+  mris: string[],
+): Promise<TeamsProfilePresentation> {
+  return api().teams.getCachedProfilePresentation(
+    mris,
+  ) as Promise<TeamsProfilePresentation>;
 }
 
 export async function cacheImageFile(

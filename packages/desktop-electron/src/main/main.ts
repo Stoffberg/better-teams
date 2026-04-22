@@ -18,15 +18,24 @@ import {
   ImageCacheIpcRequestSchema,
   ImageCachePathSchema,
   PresenceRequestSchema,
+  ProfilePresentationRequestSchema,
   ShellOpenExternalUrlSchema,
   TenantIdSchema,
 } from "../preload/contracts";
 import { performFetch } from "./http";
 import {
+  cachedImagePathFromFileName,
   cacheImageFile,
   getCachedImageFile,
   hasCachedImageFile,
 } from "./image-cache";
+import {
+  getPersistedAccounts,
+  getPersistedConversations,
+  getPersistedMessages,
+  getPersistedProfilePresentation,
+  getPersistedSession,
+} from "./persisted-teams-cache";
 import type {
   AccountOption,
   CachedPresenceEntry,
@@ -212,11 +221,31 @@ function registerIpc(): void {
   ipcMain.handle("teams:getAvailableAccounts", () =>
     runTokenWorker<AccountOption[]>({ operation: "getAvailableAccounts" }),
   );
+  ipcMain.handle("teams:getCachedAccounts", () => getPersistedAccounts());
+  ipcMain.handle("teams:getCachedSession", (_event, tenantId) =>
+    getPersistedSession(TenantIdSchema.parse(tenantId)),
+  );
   ipcMain.handle("teams:getCachedPresence", (_event, userMris) =>
     runTokenWorker<CachedPresenceEntry[]>({
       operation: "getCachedPresence",
       userMris: PresenceRequestSchema.parse(userMris),
     }),
+  );
+  ipcMain.handle("teams:getCachedProfilePresentation", (_event, mris) =>
+    getPersistedProfilePresentation(
+      ProfilePresentationRequestSchema.parse(mris),
+    ),
+  );
+  ipcMain.handle("teams:getCachedConversations", (_event, tenantId) =>
+    getPersistedConversations(TenantIdSchema.parse(tenantId)),
+  );
+  ipcMain.handle(
+    "teams:getCachedMessages",
+    (_event, tenantId, conversationId) =>
+      getPersistedMessages(
+        TenantIdSchema.parse(tenantId),
+        ImageCachePathSchema.parse(conversationId),
+      ),
   );
   ipcMain.handle("images:cacheFile", (_event, cacheKey, bytes, extension) => {
     const request = ImageCacheIpcRequestSchema.parse({
@@ -288,6 +317,9 @@ function runTokenWorker<T>(request: TokenWorkerRequest): Promise<T> {
 
 function filePathFromAssetUrl(assetUrl: string): string {
   const parsed = new URL(assetUrl);
+  if (parsed.hostname === "cache") {
+    return cachedImagePathFromFileName(decodeURIComponent(parsed.pathname));
+  }
   if (parsed.hostname !== "file") {
     throw new Error("Invalid asset host");
   }

@@ -1,6 +1,7 @@
 import {
   extractTokens,
   getAvailableAccounts,
+  getCachedSession,
 } from "@better-teams/app/services/desktop/runtime";
 import { teamsKeys } from "@better-teams/app/services/teams/query-keys";
 import { teamsSessionService } from "@better-teams/app/services/teams/session";
@@ -163,6 +164,8 @@ function resolveSelectedTenantId(
 async function initializeTeamsSession(
   tenantId?: string | null,
 ): Promise<TeamsSessionInfo> {
+  const cached = await getCachedSession(tenantId);
+  if (cached?.tenantId) return cached;
   return teamsSessionService.initialize(tenantId);
 }
 
