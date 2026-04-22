@@ -1,5 +1,4 @@
 import { THREAD_PAGE } from "@/components/chat/types";
-import { SqliteThreadCache } from "@/lib/sqlite-cache";
 import { getOrCreateClient } from "@/lib/teams-client-factory";
 import {
   type ThreadQueryData,
@@ -18,15 +17,8 @@ function preloadKey(
 export async function preloadConversationThread(
   tenantId: string | undefined,
   conversationId: string,
-  maxCacheAgeMs?: number,
+  _maxCacheAgeMs?: number,
 ): Promise<ThreadQueryData> {
-  const cached = await SqliteThreadCache.getFreshSnapshot(
-    tenantId,
-    conversationId,
-    maxCacheAgeMs,
-  );
-  if (cached) return cached.data;
-
   const key = preloadKey(tenantId, conversationId);
   const existing = preloadInFlight.get(key);
   if (existing) return existing;
@@ -34,9 +26,7 @@ export async function preloadConversationThread(
   const request = (async () => {
     const client = await getOrCreateClient(tenantId);
     const response = await client.getMessages(conversationId, THREAD_PAGE, 1);
-    const data = threadQueryDataFromResponse(response);
-    await SqliteThreadCache.storeThread(tenantId, conversationId, data);
-    return data;
+    return threadQueryDataFromResponse(response);
   })();
 
   preloadInFlight.set(key, request);

@@ -1,12 +1,19 @@
 import { describe, expect, it, vi } from "vitest";
-import { cacheImageFile, filePathToAssetUrl } from "@/lib/electron-bridge";
+import {
+  cacheImageFile,
+  filePathToAssetUrl,
+  getCachedImageFile,
+  hasCachedImageFile,
+} from "@/lib/electron-bridge";
 import { TeamsApiClient } from "./api-client";
 
 vi.mock("@/lib/electron-bridge", () => ({
   cacheImageFile: vi.fn(),
   extractTokens: vi.fn().mockResolvedValue([]),
   filePathToAssetUrl: vi.fn((filePath: string) => `asset://${filePath}`),
+  getCachedImageFile: vi.fn().mockResolvedValue(null),
   getAuthToken: vi.fn().mockResolvedValue(null),
+  hasCachedImageFile: vi.fn().mockResolvedValue(false),
 }));
 
 describe("TeamsApiClient.getPresence", () => {
@@ -347,10 +354,11 @@ describe("TeamsApiClient.sendAttachmentMessage", () => {
 
 describe("TeamsApiClient profile image caching", () => {
   it("returns cached image paths as asset urls without refetching", async () => {
+    vi.mocked(getCachedImageFile).mockResolvedValueOnce("/tmp/avatar.png");
+    vi.mocked(hasCachedImageFile).mockResolvedValueOnce(true);
     const fetchImpl = vi.fn();
     const client = new TeamsApiClient(undefined, {
       fetchImpl,
-      getCachedImagePath: vi.fn().mockResolvedValue("/tmp/avatar.png"),
     });
     Reflect.set(client, "authToken", {
       token: "bearer-token",
@@ -367,13 +375,20 @@ describe("TeamsApiClient profile image caching", () => {
     ).call(client, "https://cdn.example.com/avatar.png");
 
     expect(imageSrc).toBe("asset:///tmp/avatar.png");
+    expect(getCachedImageFile).toHaveBeenCalledWith(
+      "https://cdn.example.com/avatar.png",
+    );
+    expect(hasCachedImageFile).toHaveBeenCalledWith("/tmp/avatar.png");
     expect(filePathToAssetUrl).toHaveBeenCalledWith("/tmp/avatar.png");
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
-  it("writes fetched avatars to disk and stores the file path", async () => {
-    vi.mocked(cacheImageFile).mockResolvedValueOnce("/tmp/avatar.jpg");
-    const setCachedImagePath = vi.fn().mockResolvedValue(undefined);
+  it("refetches and recaches when the cached image file is missing", async () => {
+    vi.mocked(getCachedImageFile).mockResolvedValueOnce(
+      "/tmp/avatar-stale.jpg",
+    );
+    vi.mocked(hasCachedImageFile).mockResolvedValueOnce(false);
+    vi.mocked(cacheImageFile).mockResolvedValueOnce("/tmp/avatar-fresh.jpg");
     const fetchImpl = vi.fn().mockResolvedValue(
       new Response(Uint8Array.from([0xff, 0xd8, 0xff, 0xdb]), {
         status: 200,
@@ -384,8 +399,43 @@ describe("TeamsApiClient profile image caching", () => {
     );
     const client = new TeamsApiClient(undefined, {
       fetchImpl,
-      getCachedImagePath: vi.fn().mockResolvedValue(null),
-      setCachedImagePath,
+    });
+    Reflect.set(client, "authToken", {
+      token: "bearer-token",
+      expiresAt: new Date("2999-01-01T00:00:00Z"),
+    });
+    Reflect.set(client, "skypeToken", "skype-token");
+    Reflect.set(client, "regionGtms", {
+      middleTier: "https://teams.microsoft.com/api/mt/part/amer-03",
+    });
+
+    const imageSrc = await Reflect.get(
+      client,
+      "fetchAuthenticatedImageSrc",
+    ).call(client, "https://cdn.example.com/avatar.jpg");
+
+    expect(hasCachedImageFile).toHaveBeenCalledWith("/tmp/avatar-stale.jpg");
+    expect(fetchImpl).toHaveBeenCalled();
+    expect(cacheImageFile).toHaveBeenCalledWith(
+      "https://cdn.example.com/avatar.jpg",
+      expect.any(Uint8Array),
+      "jpg",
+    );
+    expect(imageSrc).toBe("asset:///tmp/avatar-fresh.jpg");
+  });
+
+  it("writes fetched avatars to disk", async () => {
+    vi.mocked(cacheImageFile).mockResolvedValueOnce("/tmp/avatar.jpg");
+    const fetchImpl = vi.fn().mockResolvedValue(
+      new Response(Uint8Array.from([0xff, 0xd8, 0xff, 0xdb]), {
+        status: 200,
+        headers: {
+          "content-type": "image/jpeg",
+        },
+      }),
+    );
+    const client = new TeamsApiClient(undefined, {
+      fetchImpl,
     });
     Reflect.set(client, "authToken", {
       token: "bearer-token",
@@ -406,10 +456,6 @@ describe("TeamsApiClient profile image caching", () => {
       expect.any(Uint8Array),
       "jpg",
     );
-    expect(setCachedImagePath).toHaveBeenCalledWith(
-      "https://cdn.example.com/avatar.jpg",
-      "/tmp/avatar.jpg",
-    );
     expect(imageSrc).toBe("asset:///tmp/avatar.jpg");
   });
 
@@ -425,8 +471,6 @@ describe("TeamsApiClient profile image caching", () => {
     );
     const client = new TeamsApiClient(undefined, {
       fetchImpl,
-      getCachedImagePath: vi.fn().mockResolvedValue(null),
-      setCachedImagePath: vi.fn().mockResolvedValue(undefined),
     });
     Reflect.set(client, "authToken", {
       token: "bearer-token",

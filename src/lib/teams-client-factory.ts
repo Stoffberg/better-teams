@@ -1,5 +1,4 @@
 import { fetch } from "@/lib/electron-fetch";
-import { SqliteImageCache } from "@/lib/sqlite-cache";
 import {
   TeamsApiClient,
   type TeamsApiDiagnosticEvent,
@@ -16,7 +15,9 @@ function shouldSuppressFetchErrorLog(
   url: string,
   method: string,
   status: number,
+  headers?: Headers,
 ): boolean {
+  if (headers?.get("Accept")?.includes("image/")) return true;
   if (status !== 401) return false;
   if (
     method === "POST" &&
@@ -62,7 +63,12 @@ function createClient(tenantId?: string): TeamsApiClient {
       const res = await fetch(input, { ...init, headers });
       if (!res.ok) {
         if (
-          shouldSuppressFetchErrorLog(url, init?.method ?? "GET", res.status)
+          shouldSuppressFetchErrorLog(
+            url,
+            init?.method ?? "GET",
+            res.status,
+            headers,
+          )
         ) {
           return res;
         }
@@ -77,6 +83,9 @@ function createClient(tenantId?: string): TeamsApiClient {
       }
       return res;
     } catch (err) {
+      if (headers.get("Accept")?.includes("image/")) {
+        throw err;
+      }
       console.error(`[fetch] ${init?.method ?? "GET"} ${url} THREW:`, err);
       throw err;
     }
@@ -84,8 +93,6 @@ function createClient(tenantId?: string): TeamsApiClient {
 
   return new TeamsApiClient(tenantId, {
     fetchImpl: loggingFetch,
-    getCachedImagePath: (url) => SqliteImageCache.get(url),
-    setCachedImagePath: (url, filePath) => SqliteImageCache.set(url, filePath),
     onDiagnostic,
   });
 }

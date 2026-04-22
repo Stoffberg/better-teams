@@ -92,7 +92,6 @@ function TenantScopedWorkspace() {
   const queryClient = useQueryClient();
   const { activeTenantId, accounts, isSwitchingAccount, switchAccount } =
     useActiveTeamsAccount();
-  const { workspaceShell } = useTeamsAccountContext();
   const sessionQuery = useTeamsSession();
   const session = sessionQuery.session;
   const liveSessionReady = Boolean(session);
@@ -534,22 +533,10 @@ function TenantScopedWorkspace() {
 
   const accountAvatarByTenant = useMemo(
     () =>
-      Object.fromEntries(
-        accounts.flatMap((account) => {
-          const tenantId = account.tenantId;
-          if (!tenantId) return [];
-          const skypeId = workspaceShell?.tenants[tenantId]?.session.skypeId;
-          if (!skypeId) return [];
-          const avatar =
-            avatarThumbByMri[
-              canonAvatarMri(
-                skypeId.startsWith("8:") ? skypeId : `8:${skypeId}`,
-              )
-            ];
-          return avatar ? [[tenantId, avatar] as const] : [];
-        }),
-      ),
-    [accounts, avatarThumbByMri, workspaceShell?.tenants],
+      activeTenantId && selfAvatarSrc
+        ? { [activeTenantId]: selfAvatarSrc }
+        : {},
+    [activeTenantId, selfAvatarSrc],
   );
   useEffect(() => {
     const requestedConversationId = openConversationRequest.data;

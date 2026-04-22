@@ -7,11 +7,6 @@ import {
   useSyncExternalStore,
 } from "react";
 import { getCachedPresence } from "@/lib/electron-bridge";
-import {
-  type CachedProfileLookup,
-  SqliteProfileCache,
-  SqliteWorkspaceShellStore,
-} from "@/lib/sqlite-cache";
 import { getOrCreateClient } from "@/lib/teams-client-factory";
 import {
   canonAvatarMri,
@@ -121,11 +116,7 @@ export function useTeamsSession(): {
   error: Error | null;
   refetch: () => Promise<unknown>;
 } {
-  const { activeTenantId, activeSession, workspaceShell } =
-    useTeamsAccountContext();
-  const shellSession = activeTenantId
-    ? workspaceShell?.tenants[activeTenantId]?.session
-    : undefined;
+  const { activeTenantId, activeSession } = useTeamsAccountContext();
   const query = useQuery({
     queryKey: teamsKeys.session(activeTenantId),
     queryFn: async () => {
@@ -139,24 +130,15 @@ export function useTeamsSession(): {
         region: a.region,
       } satisfies TeamsSessionInfo;
     },
-    initialData: activeSession ?? shellSession,
-    initialDataUpdatedAt: () => {
-      if (!activeTenantId) return undefined;
-      return workspaceShell?.tenants[activeTenantId]?.updatedAt;
-    },
+    initialData: activeSession,
     enabled: true,
     staleTime: 30_000,
     gcTime: Number.POSITIVE_INFINITY,
   });
 
-  useEffect(() => {
-    if (!query.data) return;
-    void SqliteWorkspaceShellStore.updateSession(activeTenantId, query.data);
-  }, [activeTenantId, query.data]);
-
   return {
     tenantId: activeTenantId,
-    session: query.data ?? activeSession ?? shellSession,
+    session: query.data ?? activeSession,
     isPending: query.isPending,
     isFetching: query.isFetching,
     isError: query.isError,
@@ -174,12 +156,9 @@ export function useTeamsConversations(liveSessionReady: boolean): {
   isSuccess: boolean;
   refetch: () => Promise<unknown>;
 } {
-  const { activeTenantId, workspaceShell } = useTeamsAccountContext();
+  const { activeTenantId } = useTeamsAccountContext();
   const documentVisible = useDocumentVisibility();
   const resumeReady = useResumeCooldown();
-  const shellConversations = activeTenantId
-    ? workspaceShell?.tenants[activeTenantId]?.conversations
-    : undefined;
 
   const query = useQuery({
     queryKey: teamsKeys.conversations(activeTenantId),
@@ -188,14 +167,6 @@ export function useTeamsConversations(liveSessionReady: boolean): {
       const conversationsResponse = await client.getAllConversations(100);
       return conversationsResponse.conversations ?? [];
     },
-    initialData: () => {
-      if (!activeTenantId) return undefined;
-      return workspaceShell?.tenants[activeTenantId]?.conversations;
-    },
-    initialDataUpdatedAt: () => {
-      if (!activeTenantId) return undefined;
-      return workspaceShell?.tenants[activeTenantId]?.updatedAt;
-    },
     enabled: liveSessionReady,
     staleTime: 30_000,
     refetchInterval: () =>
@@ -203,17 +174,9 @@ export function useTeamsConversations(liveSessionReady: boolean): {
     refetchIntervalInBackground: false,
   });
 
-  useEffect(() => {
-    if (!query.data || !activeTenantId) return;
-    void SqliteWorkspaceShellStore.updateConversations(
-      activeTenantId,
-      query.data,
-    );
-  }, [activeTenantId, query.data]);
-
   return {
     tenantId: activeTenantId,
-    conversations: query.data ?? shellConversations ?? [],
+    conversations: query.data ?? [],
     isPending: query.isPending,
     isFetching: query.isFetching,
     isError: query.isError,
@@ -222,25 +185,13 @@ export function useTeamsConversations(liveSessionReady: boolean): {
   };
 }
 
-async function fetchProfilesWithCache(
+async function fetchProfiles(
   tenantId: string | undefined,
   mris: string[],
 ): Promise<TeamsProfilePresentation> {
+  if (mris.length === 0) return normalizeProfilePresentation(null);
   const client = await getOrCreateClient(tenantId);
-  const cached: CachedProfileLookup =
-    await SqliteProfileCache.lookupProfiles(mris);
-
-  if (cached.missingMris.length === 0) {
-    return cached.presentation;
-  }
-
-  try {
-    const fresh = await client.fetchProfileAvatarDataUrls(cached.missingMris);
-    await SqliteProfileCache.storeProfiles(cached.missingMris, fresh);
-    return SqliteProfileCache.merge(cached.presentation, fresh);
-  } catch {
-    return cached.presentation;
-  }
+  return client.fetchProfileAvatarDataUrls(mris);
 }
 
 export function useTeamsProfilePresentation(args: {
@@ -275,7 +226,7 @@ export function useTeamsProfilePresentation(args: {
 
   const priorityAvatarQuery = useQuery({
     queryKey: teamsKeys.profileAvatars(activeTenantId, prioritySignature),
-    queryFn: () => fetchProfilesWithCache(activeTenantId, priorityProfileMris),
+    queryFn: () => fetchProfiles(activeTenantId, priorityProfileMris),
     enabled: Boolean(activeTenantId) && priorityProfileMris.length > 0,
     staleTime: 3_600_000,
     gcTime: PROFILE_QUERY_GC_MS,
@@ -286,7 +237,7 @@ export function useTeamsProfilePresentation(args: {
 
   const backgroundAvatarQuery = useQuery({
     queryKey: teamsKeys.profileAvatars(activeTenantId, profileMriSignature),
-    queryFn: () => fetchProfilesWithCache(activeTenantId, profileMris),
+    queryFn: () => fetchProfiles(activeTenantId, profileMris),
     enabled:
       Boolean(activeTenantId) &&
       profileMris.length > 0 &&

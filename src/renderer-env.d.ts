@@ -1,7 +1,5 @@
 /// <reference types="vite/client" />
 
-type BetterTeamsBindValue = string | number | boolean | null;
-
 type BetterTeamsRawToken = {
   host: string;
   name: string;
@@ -55,12 +53,9 @@ interface BetterTeamsDesktopApi {
       bytes: Uint8Array,
       extension: string | null,
     ): Promise<string>;
-    removeCachedImageFiles(paths: string[]): Promise<void>;
+    getCachedImageFile(cacheKey: string): Promise<string | null>;
+    hasCachedImageFile(filePath: string): Promise<boolean>;
     filePathToAssetUrl(filePath: string): string;
-  };
-  sqlite: {
-    execute(sql: string, bindValues?: BetterTeamsBindValue[]): Promise<void>;
-    select<T>(sql: string, bindValues?: BetterTeamsBindValue[]): Promise<T>;
   };
   http: {
     fetch(request: BetterTeamsFetchRequest): Promise<BetterTeamsFetchResponse>;

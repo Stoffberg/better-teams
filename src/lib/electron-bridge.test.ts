@@ -17,12 +17,9 @@ describe("electron-bridge", () => {
       },
       images: {
         cacheImageFile: vi.fn(),
-        removeCachedImageFiles: vi.fn(),
+        getCachedImageFile: vi.fn(),
+        hasCachedImageFile: vi.fn(),
         filePathToAssetUrl: vi.fn((path: string) => `asset://${path}`),
-      },
-      sqlite: {
-        execute: vi.fn(),
-        select: vi.fn(),
       },
       http: {
         fetch: vi.fn(),

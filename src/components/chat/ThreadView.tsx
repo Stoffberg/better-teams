@@ -30,7 +30,6 @@ import {
   measurePerfAsync,
   updatePerfSnapshot,
 } from "@/lib/perf";
-import { SqliteThreadCache } from "@/lib/sqlite-cache";
 import { getOrCreateClient } from "@/lib/teams-client-factory";
 import {
   useTeamsPresence,
@@ -208,32 +207,6 @@ export function profileMessageConversationId(
     ?.id;
 }
 
-export function mergeThreadSnapshots(
-  primary: ThreadQueryData | null | undefined,
-  secondary: ThreadQueryData | null | undefined,
-): ThreadQueryData | null {
-  const left = primary ?? null;
-  const right = secondary ?? null;
-  if (!left && !right) return null;
-  const mergedMessages = sortMessagesByTimestamp([
-    ...new Map(
-      [...(left?.messages ?? []), ...(right?.messages ?? [])].map((message) => [
-        message.id,
-        message,
-      ]),
-    ).values(),
-  ]);
-  const olderPageUrl = left?.olderPageUrl ?? right?.olderPageUrl ?? null;
-  return {
-    messages: mergedMessages,
-    olderPageUrl,
-    moreOlder:
-      (left?.moreOlder ?? false) ||
-      (right?.moreOlder ?? false) ||
-      (olderPageUrl != null && mergedMessages.length > 0),
-  };
-}
-
 export const ThreadView = forwardRef<ThreadViewHandle, ThreadViewProps>(
   (
     {
@@ -305,13 +278,6 @@ export const ThreadView = forwardRef<ThreadViewHandle, ThreadViewProps>(
       enabled: liveSessionReady,
       staleTime: 25_000,
     });
-    const cachedThreadQuery = useQuery({
-      queryKey: teamsKeys.threadCache(tenantId, conversationId),
-      queryFn: async () =>
-        SqliteThreadCache.getSnapshot(tenantId ?? undefined, conversationId),
-      staleTime: Number.POSITIVE_INFINITY,
-      gcTime: Number.POSITIVE_INFINITY,
-    });
     const threadMembersQuery = useQuery({
       queryKey: teamsKeys.threadMembers(tenantId, conversationId),
       queryFn: async () =>
@@ -337,18 +303,10 @@ export const ThreadView = forwardRef<ThreadViewHandle, ThreadViewProps>(
       retry: 1,
     });
 
-    const threadData = useMemo(
-      () =>
-        mergeThreadSnapshots(
-          threadQuery.data,
-          cachedThreadQuery.data?.data ?? null,
-        ),
-      [cachedThreadQuery.data?.data, threadQuery.data],
-    );
+    const threadData = threadQuery.data ?? null;
     const rawMessages = threadData?.messages ?? [];
     const threadMembers = threadMembersQuery.data ?? [];
-    const threadLoading =
-      threadQuery.isPending && !cachedThreadQuery.data?.data;
+    const threadLoading = threadQuery.isPending;
     const threadHasData = Boolean(threadData);
     const profileConversations = useMemo<Conversation[]>(
       () =>
@@ -1024,50 +982,6 @@ export const ThreadView = forwardRef<ThreadViewHandle, ThreadViewProps>(
       if (!rawMessages.some((message) => message.id === pendingId)) return;
       scrollToMessage(pendingId);
     }, [rawMessages, scrollToMessage]);
-
-    useEffect(() => {
-      if (!threadQuery.data || loadingOlder) return;
-      let cancelled = false;
-      let timer: ReturnType<typeof setTimeout> | null = null;
-      let idleHandle: number | null = null;
-
-      const storeThreadSnapshot = () => {
-        if (cancelled) return;
-        void SqliteThreadCache.storeThread(
-          tenantId ?? undefined,
-          conversationId,
-          threadQuery.data,
-        );
-      };
-
-      timer = setTimeout(() => {
-        if (typeof window !== "undefined" && "requestIdleCallback" in window) {
-          idleHandle = window.requestIdleCallback(
-            () => {
-              idleHandle = null;
-              storeThreadSnapshot();
-            },
-            { timeout: 5_000 },
-          );
-          return;
-        }
-        storeThreadSnapshot();
-      }, 10_000);
-
-      return () => {
-        cancelled = true;
-        if (timer != null) {
-          clearTimeout(timer);
-        }
-        if (
-          idleHandle != null &&
-          typeof window !== "undefined" &&
-          "cancelIdleCallback" in window
-        ) {
-          window.cancelIdleCallback(idleHandle);
-        }
-      };
-    }, [conversationId, loadingOlder, tenantId, threadQuery.data]);
 
     useEffect(() => {
       onSearchResultCountChange?.(

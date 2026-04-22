@@ -18,50 +18,10 @@ vi.mock("@/lib/electron-bridge", () => ({
   cacheImageFile: vi.fn(),
   extractTokens: vi.fn().mockResolvedValue([]),
   filePathToAssetUrl: vi.fn((filePath: string) => `asset://${filePath}`),
+  getCachedImageFile: vi.fn().mockResolvedValue(null),
   getAuthToken: vi.fn().mockResolvedValue(null),
   getAvailableAccounts: vi.fn().mockResolvedValue([]),
-  removeCachedImageFiles: vi.fn().mockResolvedValue(undefined),
-}));
-
-vi.mock("@/lib/sqlite-cache", () => ({
-  SqliteWorkspaceShellStore: {
-    getSnapshot: vi.fn().mockResolvedValue(null),
-    updateAccounts: vi.fn().mockResolvedValue(undefined),
-    updateSession: vi.fn().mockResolvedValue(undefined),
-    updateConversations: vi.fn().mockResolvedValue(undefined),
-  },
-  SqliteProfileCache: {
-    lookupProfiles: vi.fn().mockResolvedValue({
-      presentation: {
-        avatars: {},
-        displayNames: {},
-        emails: {},
-        jobTitles: {},
-      },
-      missingMris: [],
-    }),
-    storeProfiles: vi.fn().mockResolvedValue(undefined),
-    merge: vi.fn().mockImplementation((a: unknown, b: unknown) => ({
-      ...(a as Record<string, unknown>),
-      ...(b as Record<string, unknown>),
-    })),
-  },
-  SqliteImageCache: {
-    get: vi.fn().mockResolvedValue(null),
-    set: vi.fn().mockResolvedValue(undefined),
-  },
-  SqliteThreadCache: {
-    getSnapshot: vi.fn().mockResolvedValue(null),
-    getFreshSnapshot: vi.fn().mockResolvedValue(null),
-    storeThread: vi.fn().mockResolvedValue(undefined),
-  },
-  SqliteQueryPersister: {
-    getStorage: vi.fn().mockReturnValue({
-      getItem: vi.fn().mockResolvedValue(null),
-      setItem: vi.fn().mockResolvedValue(undefined),
-      removeItem: vi.fn().mockResolvedValue(undefined),
-    }),
-  },
+  hasCachedImageFile: vi.fn().mockResolvedValue(false),
 }));
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -75,7 +35,6 @@ import {
 import type { ReactElement } from "react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { PERF_FLAG, resetPerfStore } from "@/lib/perf";
-import { SqliteThreadCache } from "@/lib/sqlite-cache";
 import { getOrCreateClient } from "@/lib/teams-client-factory";
 import { preloadConversationThread } from "@/lib/teams-thread-preload";
 import { TeamsAccountProvider } from "@/providers/TeamsAccountProvider";
@@ -240,46 +199,6 @@ describe("ChatWorkspace", () => {
     });
     expect(thread).toBeInTheDocument();
     expect(await screen.findAllByText(/^Group$/i)).not.toHaveLength(0);
-  });
-
-  it("shows cached thread messages from sqlite before the live thread fetch resolves", async () => {
-    let resolveMessages!: (value: { messages: Message[] }) => void;
-    const pendingMessages = new Promise<{ messages: Message[] }>((resolve) => {
-      resolveMessages = resolve;
-    });
-    const cachedMessage = baseMessage({
-      id: "cached-1",
-      from: "8:other",
-      content: "Cached hello",
-    });
-    vi.mocked(SqliteThreadCache.getSnapshot).mockResolvedValue({
-      data: {
-        messages: [cachedMessage],
-        olderPageUrl: null,
-        moreOlder: false,
-      },
-      updatedAt: Date.now(),
-    } as never);
-    const mockClient = makeMockClient({
-      getAllConversations: vi.fn().mockResolvedValue({
-        conversations: [
-          {
-            id: "c1",
-            members: [{ id: "8:other", displayName: "Pat Lee" }],
-            lastMessage: cachedMessage,
-          },
-        ],
-      }),
-      getMessages: vi.fn().mockReturnValue(pendingMessages),
-    });
-    vi.mocked(getOrCreateClient).mockResolvedValue(mockClient as never);
-
-    renderChat();
-
-    fireEvent.click(await screen.findByText("Pat Lee"));
-    expect(await screen.findByText("Cached hello")).toBeInTheDocument();
-
-    resolveMessages({ messages: [cachedMessage] });
   });
 
   it("records selection perf metrics when perf mode is enabled", async () => {

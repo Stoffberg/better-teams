@@ -8,13 +8,6 @@ vi.mock("@/lib/electron-fetch", () => ({
   fetch: fetchMock,
 }));
 
-vi.mock("@/lib/sqlite-cache", () => ({
-  SqliteImageCache: {
-    get: vi.fn(),
-    set: vi.fn(),
-  },
-}));
-
 vi.mock("@/services/teams/api-client", () => ({
   TeamsApiClient: vi.fn().mockImplementation(function TeamsApiClientMock() {
     apiClientConstructor();

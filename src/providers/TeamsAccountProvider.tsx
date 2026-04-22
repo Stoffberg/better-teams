@@ -4,11 +4,9 @@ import {
   type ReactNode,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
   useState,
 } from "react";
-import { SqliteWorkspaceShellStore } from "@/lib/sqlite-cache";
 import {
   clearClientForTenant,
   getOrCreateClient,
@@ -18,7 +16,6 @@ import { TeamsApiClient } from "@/services/teams/api-client";
 import type {
   TeamsAccountOption,
   TeamsSessionInfo,
-  TeamsWorkspaceShellSnapshot,
 } from "@/services/teams/types";
 
 const PREFERRED_TENANT_STORAGE_KEY = "better-teams-preferred-tenant-id";
@@ -30,7 +27,6 @@ export type TeamsAccountContextValue = {
   pendingTenantId?: string | null;
   isSwitchingAccount: boolean;
   activeSession?: TeamsSessionInfo;
-  workspaceShell: TeamsWorkspaceShellSnapshot | null;
   switchAccount: (tenantId: string | null) => void;
   persistedPreference: string | null;
 };
@@ -80,16 +76,6 @@ function resolveSelectedTenantId(
   return accounts[0]?.tenantId ?? preferredTenantId ?? undefined;
 }
 
-function shellSessionForTenant(
-  workspaceShell: TeamsWorkspaceShellSnapshot | null,
-  tenantId?: string | null,
-): TeamsSessionInfo | undefined {
-  if (!tenantId) return undefined;
-  const tenantShell =
-    workspaceShell?.tenants[tenantId] ?? workspaceShell?.tenants.__default__;
-  return tenantShell?.session;
-}
-
 async function initializeTeamsSession(
   tenantId?: string | null,
 ): Promise<TeamsSessionInfo> {
@@ -106,14 +92,6 @@ async function initializeTeamsSession(
 
 export function TeamsAccountProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
-  const workspaceShellQuery = useQuery({
-    queryKey: ["workspace-shell"],
-    queryFn: () => SqliteWorkspaceShellStore.getSnapshot(),
-    staleTime: Number.POSITIVE_INFINITY,
-    gcTime: Number.POSITIVE_INFINITY,
-  });
-  const workspaceShell =
-    (workspaceShellQuery.data as TeamsWorkspaceShellSnapshot | null) ?? null;
 
   const [persistedPreference, setPersistedPreference] = useState<string | null>(
     () => readPreferredTenantId(),
@@ -124,37 +102,23 @@ export function TeamsAccountProvider({ children }: { children: ReactNode }) {
     queryKey: teamsKeys.accounts(),
     queryFn: async () =>
       normalizeAccounts((await TeamsApiClient.getAvailableAccounts()) ?? []),
-    initialData: () => {
-      const shellAccounts = normalizeAccounts(workspaceShell?.accounts);
-      return shellAccounts.length > 0 ? shellAccounts : undefined;
-    },
     staleTime: 30_000,
     gcTime: Number.POSITIVE_INFINITY,
   });
 
   const accounts = useMemo(
-    () => normalizeAccounts(accountsQuery.data ?? workspaceShell?.accounts),
-    [accountsQuery.data, workspaceShell?.accounts],
+    () => normalizeAccounts(accountsQuery.data),
+    [accountsQuery.data],
   );
 
-  useEffect(() => {
-    if (accounts.length === 0) return;
-    void SqliteWorkspaceShellStore.updateAccounts(accounts);
-  }, [accounts]);
   const selectedTenantId = resolveSelectedTenantId(
     accounts,
     persistedPreference,
   );
-  const shellSession = shellSessionForTenant(workspaceShell, selectedTenantId);
 
   const sessionQuery = useQuery({
     queryKey: teamsKeys.session(selectedTenantId),
     queryFn: async () => initializeTeamsSession(selectedTenantId),
-    initialData: shellSession,
-    initialDataUpdatedAt: () => {
-      if (!selectedTenantId) return undefined;
-      return workspaceShell?.tenants[selectedTenantId]?.updatedAt;
-    },
     enabled: true,
     staleTime: 30_000,
     gcTime: Number.POSITIVE_INFINITY,
@@ -191,8 +155,7 @@ export function TeamsAccountProvider({ children }: { children: ReactNode }) {
     [persistedPreference, queryClient, selectedTenantId],
   );
 
-  const activeTenantId =
-    selectedTenantId ?? sessionQuery.data?.tenantId ?? shellSession?.tenantId;
+  const activeTenantId = selectedTenantId ?? sessionQuery.data?.tenantId;
 
   const value = useMemo<TeamsAccountContextValue>(
     () => ({
@@ -202,8 +165,7 @@ export function TeamsAccountProvider({ children }: { children: ReactNode }) {
       pendingTenantId,
       isSwitchingAccount:
         pendingTenantId != null && pendingTenantId === selectedTenantId,
-      activeSession: sessionQuery.data ?? shellSession,
-      workspaceShell,
+      activeSession: sessionQuery.data,
       switchAccount,
       persistedPreference,
     }),
@@ -214,9 +176,7 @@ export function TeamsAccountProvider({ children }: { children: ReactNode }) {
       persistedPreference,
       selectedTenantId,
       sessionQuery.data,
-      shellSession,
       switchAccount,
-      workspaceShell,
     ],
   );
 

@@ -48,6 +48,7 @@ vi.mock("@/lib/electron-bridge", () => ({
     },
   ]),
   filePathToAssetUrl: vi.fn((filePath: string) => `asset://${filePath}`),
+  getCachedImageFile: vi.fn().mockResolvedValue(null),
   getAuthToken: vi.fn().mockResolvedValue({
     host: ".teams.microsoft.com",
     name: "authtoken",
@@ -58,43 +59,7 @@ vi.mock("@/lib/electron-bridge", () => ({
     expiresAt: new Date(Date.now() + 3600000),
   }),
   getAvailableAccounts: vi.fn().mockResolvedValue([]),
-  removeCachedImageFiles: vi.fn().mockResolvedValue(undefined),
-}));
-
-vi.mock("@/lib/sqlite-cache", () => ({
-  SqliteWorkspaceShellStore: {
-    getSnapshot: vi.fn().mockResolvedValue(null),
-    updateAccounts: vi.fn().mockResolvedValue(undefined),
-    updateSession: vi.fn().mockResolvedValue(undefined),
-    updateConversations: vi.fn().mockResolvedValue(undefined),
-  },
-  SqliteProfileCache: {
-    lookupProfiles: vi.fn().mockResolvedValue({
-      presentation: {
-        avatars: {},
-        displayNames: {},
-        emails: {},
-        jobTitles: {},
-      },
-      missingMris: [],
-    }),
-    storeProfiles: vi.fn().mockResolvedValue(undefined),
-    merge: vi.fn().mockImplementation((a: unknown, b: unknown) => ({
-      ...(a as Record<string, unknown>),
-      ...(b as Record<string, unknown>),
-    })),
-  },
-  SqliteImageCache: {
-    get: vi.fn().mockResolvedValue(null),
-    set: vi.fn().mockResolvedValue(undefined),
-  },
-  SqliteQueryPersister: {
-    getStorage: vi.fn().mockReturnValue({
-      getItem: vi.fn().mockResolvedValue(null),
-      setItem: vi.fn().mockResolvedValue(undefined),
-      removeItem: vi.fn().mockResolvedValue(undefined),
-    }),
-  },
+  hasCachedImageFile: vi.fn().mockResolvedValue(false),
 }));
 
 function renderApp() {

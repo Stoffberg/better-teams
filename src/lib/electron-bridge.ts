@@ -91,9 +91,14 @@ export async function cacheImageFile(
   return api().images.cacheImageFile(cacheKey, bytes, extension ?? null);
 }
 
-export async function removeCachedImageFiles(paths: string[]): Promise<void> {
-  if (paths.length === 0) return;
-  await api().images.removeCachedImageFiles(paths);
+export async function getCachedImageFile(
+  cacheKey: string,
+): Promise<string | null> {
+  return api().images.getCachedImageFile(cacheKey);
+}
+
+export async function hasCachedImageFile(filePath: string): Promise<boolean> {
+  return api().images.hasCachedImageFile(filePath);
 }
 
 export function filePathToAssetUrl(filePath: string): string {

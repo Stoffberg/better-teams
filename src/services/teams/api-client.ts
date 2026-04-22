@@ -20,6 +20,8 @@ import {
   extractTokens,
   filePathToAssetUrl,
   getAuthToken,
+  getCachedImageFile,
+  hasCachedImageFile,
 } from "@/lib/electron-bridge";
 import {
   applyProfileDisplayNameToRowMrIs,
@@ -87,8 +89,6 @@ export type TeamsApiClientOptions = {
     init?: RequestInit,
   ) => Promise<Response>;
   onDiagnostic?: (event: TeamsApiDiagnosticEvent) => void;
-  getCachedImagePath?: (url: string) => string | Promise<string | null> | null;
-  setCachedImagePath?: (url: string, filePath: string) => void | Promise<void>;
 };
 
 function imageFileExtensionFromMime(mime: string): string | null {
@@ -221,13 +221,6 @@ export class TeamsApiClient {
     init?: RequestInit,
   ) => Promise<Response>;
   private readonly onDiagnostic?: (event: TeamsApiDiagnosticEvent) => void;
-  private readonly getCachedImagePath?: (
-    url: string,
-  ) => string | Promise<string | null> | null;
-  private readonly setCachedImagePath?: (
-    url: string,
-    filePath: string,
-  ) => void | Promise<void>;
   private presenceAvailable = true;
 
   constructor(tenantId?: string, options?: TeamsApiClientOptions) {
@@ -236,8 +229,6 @@ export class TeamsApiClient {
       options?.fetchImpl ??
       ((input, init) => globalThis.fetch(input as RequestInfo, init));
     this.onDiagnostic = options?.onDiagnostic;
-    this.getCachedImagePath = options?.getCachedImagePath;
-    this.setCachedImagePath = options?.setCachedImagePath;
   }
 
   private emitDiagnostic(event: TeamsApiDiagnosticEvent): void {
@@ -1147,10 +1138,10 @@ export class TeamsApiClient {
   async fetchAuthenticatedImageSrc(imageUrl: string): Promise<string | null> {
     await this.refreshIfNeeded();
     const resolved = this.resolveProfileImageUrl(imageUrl);
-    const cached = this.getCachedImagePath
-      ? await this.getCachedImagePath(resolved)
-      : null;
-    if (cached) return filePathToAssetUrl(cached);
+    const cached = await getCachedImageFile(resolved);
+    if (cached && (await hasCachedImageFile(cached))) {
+      return filePathToAssetUrl(cached);
+    }
     const accept =
       "image/avif,image/webp,image/apng,image/png,image/*,*/*;q=0.8";
     const companion = this.companionHeadersForTeamsMicrosoftCom(resolved);
@@ -1204,10 +1195,15 @@ export class TeamsApiClient {
     }
 
     for (const headers of headerSets) {
-      const res = await this.httpFetch(resolved, {
-        headers,
-        redirect: "follow",
-      });
+      let res: Response;
+      try {
+        res = await this.httpFetch(resolved, {
+          headers,
+          redirect: "follow",
+        });
+      } catch {
+        continue;
+      }
       if (!res.ok) continue;
       const buf = await res.arrayBuffer();
       if (buf.byteLength === 0 || buf.byteLength > 20_000_000) return null;
@@ -1223,9 +1219,6 @@ export class TeamsApiClient {
         bytes,
         imageFileExtensionFromMime(ct) ?? undefined,
       );
-      if (this.setCachedImagePath) {
-        await this.setCachedImagePath(resolved, filePath);
-      }
       return filePathToAssetUrl(filePath);
     }
     return null;

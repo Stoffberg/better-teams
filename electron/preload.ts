@@ -19,16 +19,12 @@ contextBridge.exposeInMainWorld("betterTeams", {
       bytes: Uint8Array,
       extension: string | null,
     ) => invoke("images:cacheFile", cacheKey, Array.from(bytes), extension),
-    removeCachedImageFiles: (paths: string[]) =>
-      invoke("images:removeFiles", paths),
+    getCachedImageFile: (cacheKey: string) =>
+      invoke("images:getCachedFile", cacheKey),
+    hasCachedImageFile: (filePath: string) =>
+      invoke("images:hasCachedFile", filePath),
     filePathToAssetUrl: (filePath: string) =>
       `better-teams-asset://file/${encodeURIComponent(filePath)}`,
-  },
-  sqlite: {
-    execute: (sql: string, bindValues?: BetterTeamsBindValue[]) =>
-      invoke("sqlite:execute", sql, bindValues ?? []),
-    select: <T>(sql: string, bindValues?: BetterTeamsBindValue[]) =>
-      invoke<T>("sqlite:select", sql, bindValues ?? []),
   },
   http: {
     fetch: (request: BetterTeamsFetchRequest) => invoke("http:fetch", request),

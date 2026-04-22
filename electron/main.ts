@@ -13,8 +13,11 @@ import {
 } from "electron";
 import started from "electron-squirrel-startup";
 import { performFetch } from "./http";
-import { cacheImageFile, removeCachedImageFiles } from "./image-cache";
-import { execute, select } from "./sqlite";
+import {
+  cacheImageFile,
+  getCachedImageFile,
+  hasCachedImageFile,
+} from "./image-cache";
 import {
   extractTokens,
   getAuthToken,
@@ -59,8 +62,15 @@ registerIpc();
 
 app.whenReady().then(() => {
   protocol.handle("better-teams-asset", (request) => {
-    const filePath = filePathFromAssetUrl(request.url);
-    return net.fetch(pathToFileURL(filePath).toString());
+    try {
+      const filePath = filePathFromAssetUrl(request.url);
+      if (!hasCachedImageFile(filePath)) {
+        return new Response(null, { status: 404 });
+      }
+      return net.fetch(pathToFileURL(filePath).toString());
+    } catch {
+      return new Response(null, { status: 404 });
+    }
   });
   createWindow();
   createTray();
@@ -185,14 +195,11 @@ function registerIpc(): void {
     (_event, cacheKey: string, bytes: number[], extension: string | null) =>
       cacheImageFile(cacheKey, Uint8Array.from(bytes), extension),
   );
-  ipcMain.handle("images:removeFiles", (_event, paths: string[]) =>
-    removeCachedImageFiles(paths),
+  ipcMain.handle("images:getCachedFile", (_event, cacheKey: string) =>
+    getCachedImageFile(cacheKey),
   );
-  ipcMain.handle("sqlite:execute", (_event, sql: string, bindValues = []) =>
-    execute(sql, bindValues),
-  );
-  ipcMain.handle("sqlite:select", (_event, sql: string, bindValues = []) =>
-    select(sql, bindValues),
+  ipcMain.handle("images:hasCachedFile", (_event, filePath: string) =>
+    hasCachedImageFile(filePath),
   );
   ipcMain.handle("http:fetch", (_event, request) => performFetch(request));
   ipcMain.handle("shell:openExternal", (_event, url: string) =>

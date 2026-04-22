@@ -1,8 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { Message } from "@/services/teams/types";
 import {
   captureScrollRestoreAnchor,
-  mergeThreadSnapshots,
   olderPrefetchThresholdForVelocity,
   profileMessageConversationId,
   restoreScrollRestoreAnchor,
@@ -105,41 +103,5 @@ describe("older message prefetch", () => {
     expect(olderPrefetchThresholdForVelocity(10)).toBe(7800);
     expect(shouldPrefetchOlderMessages(3200, 2)).toBe(true);
     expect(shouldPrefetchOlderMessages(3200, 0.2)).toBe(false);
-  });
-});
-
-describe("thread snapshot merge", () => {
-  it("keeps cached older messages when live data arrives", () => {
-    const oldMessage = {
-      id: "m-1",
-      from: "8:a",
-      conversationId: "c1",
-      originalarrivaltime: "2026-04-21T10:00:00.000Z",
-    } as Message;
-    const liveMessage = {
-      id: "m-2",
-      from: "8:a",
-      conversationId: "c1",
-      originalarrivaltime: "2026-04-21T10:05:00.000Z",
-    } as Message;
-
-    expect(
-      mergeThreadSnapshots(
-        {
-          messages: [liveMessage],
-          olderPageUrl: "live-older",
-          moreOlder: true,
-        },
-        {
-          messages: [oldMessage, liveMessage],
-          olderPageUrl: "cached-older",
-          moreOlder: true,
-        },
-      ),
-    ).toEqual({
-      messages: [oldMessage, liveMessage],
-      olderPageUrl: "live-older",
-      moreOlder: true,
-    });
   });
 });

@@ -4,6 +4,8 @@ import os from "node:os";
 import path from "node:path";
 import { app } from "electron";
 
+const IMAGE_EXTENSIONS = ["jpg", "png", "gif", "webp", "avif", "img"] as const;
+
 export function cacheImageFile(
   cacheKey: string,
   bytes: Uint8Array,
@@ -11,21 +13,23 @@ export function cacheImageFile(
 ): string {
   const dir = imageCacheDir();
   const filePath = path.join(dir, hashedFilename(cacheKey, extension));
+  removeCachedImageVariants(cacheKey, filePath);
   fs.writeFileSync(filePath, bytes);
   return filePath;
 }
 
-export function removeCachedImageFiles(paths: string[]): void {
+export function getCachedImageFile(cacheKey: string): string | null {
   const dir = imageCacheDir();
-  for (const filePath of paths) {
-    const candidate = path.resolve(filePath);
-    if (!isWithinDir(candidate, dir)) continue;
-    try {
-      fs.rmSync(candidate, { force: true });
-    } catch (error) {
-      throw new Error(`Failed to remove cached image file: ${String(error)}`);
-    }
+  for (const extension of IMAGE_EXTENSIONS) {
+    const filePath = path.join(dir, hashedFilename(cacheKey, extension));
+    if (isFile(filePath)) return filePath;
   }
+  return null;
+}
+
+export function hasCachedImageFile(filePath: string): boolean {
+  const candidate = path.resolve(filePath);
+  return isWithinDir(candidate, imageCacheDir()) && isFile(candidate);
 }
 
 function imageCacheDir(): string {
@@ -40,6 +44,20 @@ function imageCacheDir(): string {
 function hashedFilename(cacheKey: string, extension?: string | null): string {
   const digest = createHash("sha1").update(cacheKey).digest("hex");
   return `${digest}.${normalizedExtension(extension)}`;
+}
+
+function removeCachedImageVariants(cacheKey: string, keepPath: string): void {
+  const dir = imageCacheDir();
+  const keep = path.resolve(keepPath);
+  for (const extension of IMAGE_EXTENSIONS) {
+    const filePath = path.resolve(
+      path.join(dir, hashedFilename(cacheKey, extension)),
+    );
+    if (filePath === keep) continue;
+    try {
+      fs.rmSync(filePath, { force: true });
+    } catch {}
+  }
 }
 
 function normalizedExtension(extension?: string | null): string {
@@ -59,4 +77,12 @@ function isWithinDir(filePath: string, dir: string): boolean {
     !relative.startsWith("..") &&
     !path.isAbsolute(relative)
   );
+}
+
+function isFile(filePath: string): boolean {
+  try {
+    return fs.statSync(filePath).isFile();
+  } catch {
+    return false;
+  }
 }
